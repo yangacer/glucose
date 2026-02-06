@@ -40,7 +40,9 @@ class GlucoseHandler(http.server.SimpleHTTPRequestHandler):
         elif path == '/api/intake':
             self.handle_get_intake_list(query_params)
         elif path == '/api/supplements':
-            self.handle_get_supplements_list(query_params)
+            self.handle_get_supplements_master()
+        elif path == '/api/supplement-intake':
+            self.handle_get_supplement_intake_list(query_params)
         elif path == '/api/event':
             self.handle_get_event_list(query_params)
         elif path == '/api/dashboard/glucose-chart':
@@ -74,7 +76,9 @@ class GlucoseHandler(http.server.SimpleHTTPRequestHandler):
         elif self.path == '/api/intake':
             self.handle_post_intake(data)
         elif self.path == '/api/supplements':
-            self.handle_post_supplements(data)
+            self.handle_post_supplements_master(data)
+        elif self.path == '/api/supplement-intake':
+            self.handle_post_supplement_intake(data)
         elif self.path == '/api/event':
             self.handle_post_event(data)
         elif self.path == '/api/nutrition':
@@ -99,7 +103,10 @@ class GlucoseHandler(http.server.SimpleHTTPRequestHandler):
             self.handle_update_intake(record_id, data)
         elif self.path.startswith('/api/supplements/'):
             record_id = int(self.path.split('/')[-1])
-            self.handle_update_supplements(record_id, data)
+            self.handle_update_supplements_master(record_id, data)
+        elif self.path.startswith('/api/supplement-intake/'):
+            record_id = int(self.path.split('/')[-1])
+            self.handle_update_supplement_intake(record_id, data)
         elif self.path.startswith('/api/event/'):
             record_id = int(self.path.split('/')[-1])
             self.handle_update_event(record_id, data)
@@ -122,7 +129,10 @@ class GlucoseHandler(http.server.SimpleHTTPRequestHandler):
             self.handle_delete_intake(record_id)
         elif self.path.startswith('/api/supplements/'):
             record_id = int(self.path.split('/')[-1])
-            self.handle_delete_supplements(record_id)
+            self.handle_delete_supplements_master(record_id)
+        elif self.path.startswith('/api/supplement-intake/'):
+            record_id = int(self.path.split('/')[-1])
+            self.handle_delete_supplement_intake(record_id)
         elif self.path.startswith('/api/event/'):
             record_id = int(self.path.split('/')[-1])
             self.handle_delete_event(record_id)
@@ -179,13 +189,25 @@ class GlucoseHandler(http.server.SimpleHTTPRequestHandler):
         self._set_headers(201)
         self.wfile.write(json.dumps({'success': True, 'nutrition_kcal': nutrition_kcal}).encode())
     
-    def handle_post_supplements(self, data):
+    def handle_post_supplements_master(self, data):
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
         cursor.execute('''INSERT INTO supplements 
-                         (timestamp, supplement_name, supplement_amount) 
+                         (supplement_name, default_amount) 
+                         VALUES (?, ?)''',
+                      (data['supplement_name'], data.get('default_amount', 1)))
+        conn.commit()
+        conn.close()
+        self._set_headers(201)
+        self.wfile.write(json.dumps({'success': True}).encode())
+    
+    def handle_post_supplement_intake(self, data):
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute('''INSERT INTO supplement_intake 
+                         (timestamp, supplement_id, supplement_amount) 
                          VALUES (?, ?, ?)''',
-                      (data['timestamp'], data['supplement_name'], 
+                      (data['timestamp'], data['supplement_id'], 
                        data['supplement_amount']))
         conn.commit()
         conn.close()
@@ -312,7 +334,20 @@ class GlucoseHandler(http.server.SimpleHTTPRequestHandler):
         self._set_headers()
         self.wfile.write(json.dumps(records).encode())
     
-    def handle_get_supplements_list(self, query_params):
+    def handle_get_supplements_master(self):
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute('SELECT id, supplement_name, default_amount FROM supplements')
+        rows = cursor.fetchall()
+        conn.close()
+        
+        supplements_list = [{'id': row[0], 'supplement_name': row[1], 
+                            'default_amount': row[2]} for row in rows]
+        
+        self._set_headers()
+        self.wfile.write(json.dumps(supplements_list).encode())
+    
+    def handle_get_supplement_intake_list(self, query_params):
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
         
@@ -320,22 +355,26 @@ class GlucoseHandler(http.server.SimpleHTTPRequestHandler):
         end_date = query_params.get('end_date', [None])[0]
         
         if start_date and end_date:
-            cursor.execute('''SELECT id, timestamp, supplement_name, supplement_amount 
-                             FROM supplements 
-                             WHERE timestamp BETWEEN ? AND ? 
-                             ORDER BY timestamp DESC''',
+            cursor.execute('''SELECT si.id, si.timestamp, si.supplement_id, s.supplement_name, 
+                                    si.supplement_amount
+                             FROM supplement_intake si
+                             JOIN supplements s ON si.supplement_id = s.id
+                             WHERE si.timestamp BETWEEN ? AND ? 
+                             ORDER BY si.timestamp DESC''',
                           (start_date, end_date + ' 23:59:59'))
         else:
-            cursor.execute('''SELECT id, timestamp, supplement_name, supplement_amount 
-                             FROM supplements 
-                             WHERE timestamp >= datetime('now', '-1 day')
-                             ORDER BY timestamp DESC''')
+            cursor.execute('''SELECT si.id, si.timestamp, si.supplement_id, s.supplement_name, 
+                                    si.supplement_amount
+                             FROM supplement_intake si
+                             JOIN supplements s ON si.supplement_id = s.id
+                             WHERE si.timestamp >= datetime('now', '-1 day')
+                             ORDER BY si.timestamp DESC''')
         
         rows = cursor.fetchall()
         conn.close()
         
-        records = [{'id': row[0], 'timestamp': row[1], 'supplement_name': row[2], 
-                   'supplement_amount': row[3]} for row in rows]
+        records = [{'id': row[0], 'timestamp': row[1], 'supplement_id': row[2], 
+                   'supplement_name': row[3], 'supplement_amount': row[4]} for row in rows]
         self._set_headers()
         self.wfile.write(json.dumps(records).encode())
     
@@ -389,13 +428,29 @@ class GlucoseHandler(http.server.SimpleHTTPRequestHandler):
                          WHERE i.timestamp BETWEEN ? AND ?
                          ORDER BY i.timestamp ASC''',
                       (prev_start, prev_end))
-        rows = cursor.fetchall()
+        intake_rows = cursor.fetchall()
+        
+        # Get supplement intake records from previous window
+        cursor.execute('''SELECT si.supplement_id, s.supplement_name, si.supplement_amount
+                         FROM supplement_intake si
+                         JOIN supplements s ON si.supplement_id = s.id
+                         WHERE si.timestamp BETWEEN ? AND ?
+                         ORDER BY si.timestamp ASC''',
+                      (prev_start, prev_end))
+        supplement_rows = cursor.fetchall()
+        
         conn.close()
         
-        records = [{'nutrition_id': row[0], 'nutrition_name': row[1], 
-                   'nutrition_amount': row[2]} for row in rows]
+        intake_records = [{'nutrition_id': row[0], 'nutrition_name': row[1], 
+                          'nutrition_amount': row[2]} for row in intake_rows]
+        supplement_records = [{'supplement_id': row[0], 'supplement_name': row[1], 
+                              'supplement_amount': row[2]} for row in supplement_rows]
+        
         self._set_headers()
-        self.wfile.write(json.dumps(records).encode())
+        self.wfile.write(json.dumps({
+            'nutrition': intake_records,
+            'supplements': supplement_records
+        }).encode())
     
     def handle_get_glucose_chart(self, start_date, end_date):
         conn = sqlite3.connect(DB_PATH)
@@ -552,9 +607,11 @@ class GlucoseHandler(http.server.SimpleHTTPRequestHandler):
         grouped_events = ', '.join([e[0] for e in events]) if events else ''
         
         # Get supplements in window
-        cursor.execute('''SELECT supplement_name, supplement_amount FROM supplements
-                         WHERE timestamp BETWEEN ? AND ?
-                         ORDER BY timestamp''',
+        cursor.execute('''SELECT s.supplement_name, si.supplement_amount 
+                         FROM supplement_intake si
+                         JOIN supplements s ON si.supplement_id = s.id
+                         WHERE si.timestamp BETWEEN ? AND ?
+                         ORDER BY si.timestamp''',
                       (window_start, window_end))
         supplements = cursor.fetchall()
         grouped_supplements = ', '.join([f"{s[0]} {s[1]}" for s in supplements]) if supplements else ''
@@ -571,145 +628,6 @@ class GlucoseHandler(http.server.SimpleHTTPRequestHandler):
             'grouped_supplements': grouped_supplements,
             'grouped_events': grouped_events
         }
-
-        def handle_update_glucose(self, record_id, data):
-            conn = sqlite3.connect(DB_PATH)
-            cursor = conn.cursor()
-            cursor.execute('UPDATE glucose SET timestamp = ?, level = ? WHERE id = ?',
-                          (data['timestamp'], data['level'], record_id))
-            conn.commit()
-            conn.close()
-            self._set_headers()
-            self.wfile.write(json.dumps({'success': True}).encode())
-    
-        def handle_update_insulin(self, record_id, data):
-            conn = sqlite3.connect(DB_PATH)
-            cursor = conn.cursor()
-            cursor.execute('UPDATE insulin SET timestamp = ?, level = ? WHERE id = ?',
-                          (data['timestamp'], data['level'], record_id))
-            conn.commit()
-            conn.close()
-            self._set_headers()
-            self.wfile.write(json.dumps({'success': True}).encode())
-    
-        def handle_update_intake(self, record_id, data):
-            conn = sqlite3.connect(DB_PATH)
-            cursor = conn.cursor()
-            cursor.execute('SELECT kcal_per_gram FROM nutrition WHERE id = ?',
-                          (data['nutrition_id'],))
-            result = cursor.fetchone()
-            if not result:
-                conn.close()
-                self._set_headers(400)
-                self.wfile.write(json.dumps({'error': 'Nutrition not found'}).encode())
-                return
-        
-            kcal_per_gram = result[0]
-            nutrition_kcal = data['nutrition_amount'] * kcal_per_gram
-        
-            cursor.execute('''UPDATE intake 
-                             SET timestamp = ?, nutrition_id = ?, nutrition_amount = ?, nutrition_kcal = ?
-                             WHERE id = ?''',
-                          (data['timestamp'], data['nutrition_id'], 
-                           data['nutrition_amount'], nutrition_kcal, record_id))
-            conn.commit()
-            conn.close()
-            self._set_headers()
-            self.wfile.write(json.dumps({'success': True}).encode())
-    
-        def handle_update_supplements(self, record_id, data):
-            conn = sqlite3.connect(DB_PATH)
-            cursor = conn.cursor()
-            cursor.execute('''UPDATE supplements 
-                             SET timestamp = ?, supplement_name = ?, supplement_amount = ?
-                             WHERE id = ?''',
-                          (data['timestamp'], data['supplement_name'], 
-                           data['supplement_amount'], record_id))
-            conn.commit()
-            conn.close()
-            self._set_headers()
-            self.wfile.write(json.dumps({'success': True}).encode())
-    
-        def handle_update_event(self, record_id, data):
-            conn = sqlite3.connect(DB_PATH)
-            cursor = conn.cursor()
-            cursor.execute('''UPDATE event 
-                             SET timestamp = ?, event_name = ?, event_notes = ?
-                             WHERE id = ?''',
-                          (data['timestamp'], data['event_name'], 
-                           data.get('event_notes', ''), record_id))
-            conn.commit()
-            conn.close()
-            self._set_headers()
-            self.wfile.write(json.dumps({'success': True}).encode())
-    
-        def handle_update_nutrition(self, record_id, data):
-            conn = sqlite3.connect(DB_PATH)
-            cursor = conn.cursor()
-            cursor.execute('''UPDATE nutrition 
-                             SET nutrition_name = ?, kcal = ?, weight = ?
-                             WHERE id = ?''',
-                          (data['nutrition_name'], data['kcal'], data['weight'], record_id))
-            conn.commit()
-            conn.close()
-            self._set_headers()
-            self.wfile.write(json.dumps({'success': True}).encode())
-    
-        # DELETE handlers
-        def handle_delete_glucose(self, record_id):
-            conn = sqlite3.connect(DB_PATH)
-            cursor = conn.cursor()
-            cursor.execute('DELETE FROM glucose WHERE id = ?', (record_id,))
-            conn.commit()
-            conn.close()
-            self._set_headers()
-            self.wfile.write(json.dumps({'success': True}).encode())
-    
-        def handle_delete_insulin(self, record_id):
-            conn = sqlite3.connect(DB_PATH)
-            cursor = conn.cursor()
-            cursor.execute('DELETE FROM insulin WHERE id = ?', (record_id,))
-            conn.commit()
-            conn.close()
-            self._set_headers()
-            self.wfile.write(json.dumps({'success': True}).encode())
-    
-        def handle_delete_intake(self, record_id):
-            conn = sqlite3.connect(DB_PATH)
-            cursor = conn.cursor()
-            cursor.execute('DELETE FROM intake WHERE id = ?', (record_id,))
-            conn.commit()
-            conn.close()
-            self._set_headers()
-            self.wfile.write(json.dumps({'success': True}).encode())
-    
-        def handle_delete_supplements(self, record_id):
-            conn = sqlite3.connect(DB_PATH)
-            cursor = conn.cursor()
-            cursor.execute('DELETE FROM supplements WHERE id = ?', (record_id,))
-            conn.commit()
-            conn.close()
-            self._set_headers()
-            self.wfile.write(json.dumps({'success': True}).encode())
-    
-        def handle_delete_event(self, record_id):
-            conn = sqlite3.connect(DB_PATH)
-            cursor = conn.cursor()
-            cursor.execute('DELETE FROM event WHERE id = ?', (record_id,))
-            conn.commit()
-            conn.close()
-            self._set_headers()
-            self.wfile.write(json.dumps({'success': True}).encode())
-    
-        def handle_delete_nutrition(self, record_id):
-            conn = sqlite3.connect(DB_PATH)
-            cursor = conn.cursor()
-            cursor.execute('DELETE FROM nutrition WHERE id = ?', (record_id,))
-            conn.commit()
-            conn.close()
-            self._set_headers()
-            self.wfile.write(json.dumps({'success': True}).encode())
-
 
     # UPDATE handlers
     def handle_update_glucose(self, record_id, data):
@@ -757,13 +675,25 @@ class GlucoseHandler(http.server.SimpleHTTPRequestHandler):
         self._set_headers()
         self.wfile.write(json.dumps({'success': True}).encode())
     
-    def handle_update_supplements(self, record_id, data):
+    def handle_update_supplements_master(self, record_id, data):
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
         cursor.execute('''UPDATE supplements 
-                         SET timestamp = ?, supplement_name = ?, supplement_amount = ?
+                         SET supplement_name = ?, default_amount = ?
                          WHERE id = ?''',
-                      (data['timestamp'], data['supplement_name'], 
+                      (data['supplement_name'], data.get('default_amount', 1), record_id))
+        conn.commit()
+        conn.close()
+        self._set_headers()
+        self.wfile.write(json.dumps({'success': True}).encode())
+    
+    def handle_update_supplement_intake(self, record_id, data):
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute('''UPDATE supplement_intake 
+                         SET timestamp = ?, supplement_id = ?, supplement_amount = ?
+                         WHERE id = ?''',
+                      (data['timestamp'], data['supplement_id'], 
                        data['supplement_amount'], record_id))
         conn.commit()
         conn.close()
@@ -795,9 +725,6 @@ class GlucoseHandler(http.server.SimpleHTTPRequestHandler):
         self._set_headers()
         self.wfile.write(json.dumps({'success': True}).encode())
     
-    # DELETE handlers
-    def handle_delete_glucose(self, record_id):
-        conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
         cursor.execute('DELETE FROM glucose WHERE id = ?', (record_id,))
         conn.commit()
@@ -823,10 +750,19 @@ class GlucoseHandler(http.server.SimpleHTTPRequestHandler):
         self._set_headers()
         self.wfile.write(json.dumps({'success': True}).encode())
     
-    def handle_delete_supplements(self, record_id):
+    def handle_delete_supplements_master(self, record_id):
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
         cursor.execute('DELETE FROM supplements WHERE id = ?', (record_id,))
+        conn.commit()
+        conn.close()
+        self._set_headers()
+        self.wfile.write(json.dumps({'success': True}).encode())
+    
+    def handle_delete_supplement_intake(self, record_id):
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute('DELETE FROM supplement_intake WHERE id = ?', (record_id,))
         conn.commit()
         conn.close()
         self._set_headers()

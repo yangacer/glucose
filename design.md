@@ -11,9 +11,10 @@
     1. glucose table is consist of timestamp and positive integer value of glucose level
     2. insulin table is consist of timestamp and positive float point value of insulin level
     3. intake table is consist of timestamp, id of nutrition, float point value of nutrition amount in gram, and float point value of nutrition amount in kcal
-    4. supplements table is consist of timestamp, string value of supplement name, and positive float point value of supplement amount
-    5. event table is consist of timestamp, string value of event name, and string value of event notes
-    6. nutrition table is consist of nutrition id, string value of nutrition name, float point value of kcal, float point value of weight in gram, and calculated kcal per gram (kcal/weight)
+    4. supplements table is a master table consist of supplement id, string value of supplement name, and float point value of default_amount with default value 1
+    5. supplement_intake table is consist of timestamp, id of supplement, and float point value of supplement amount
+    6. event table is consist of timestamp, string value of event name, and string value of event notes
+    7. nutrition table is consist of nutrition id, string value of nutrition name, float point value of kcal, float point value of weight in gram, and calculated kcal per gram (kcal/weight)
 
     ```sql
     CREATE TABLE glucose (
@@ -35,8 +36,13 @@
     );
     CREATE TABLE supplements (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        timestamp DATETIME NOT NULL,
         supplement_name TEXT NOT NULL,
+        default_amount REAL NOT NULL DEFAULT 1
+    );
+    CREATE TABLE supplement_intake (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        timestamp DATETIME NOT NULL,
+        supplement_id INTEGER REFERENCES supplements(id),
         supplement_amount REAL NOT NULL
     );
     CREATE TABLE event (
@@ -65,34 +71,42 @@
         - Timestamp (datetime input)
         - Insulin Level (number input)
     3. Intake Input Form
-        - Timestamp (datetime input)
-        - Dynamic list of nutrition items with Add/Remove buttons
-        - Multiple intake records can share the same timestamp to represent a single meal
-        - For each nutrition item:
-            - Nutrition (dropdown select from nutrition table)
-            - Nutrition Amount (number input in gram)
-            - Nutrition kCal (auto calculated from selected nutrition)
-            - Remove button (to remove this nutrition item from the form)
-        - The form should keep at least one nutrition item input row by default
-        - The form data should be autofilled nutrition items with last
-          submitted values for convenience. When the form is loaded, it should
-          query recent intake records for the previous time-window and
-          pre-populate the nutrition item rows with the same nutrition items
-          and their amounts. If there are no previous intake records, it should
-          show one empty nutrition item row by default.
+        - Timestamp (datetime input) - shared by all nutrition and supplement items
+        - Nutrition Items Section:
+            - Dynamic list of nutrition items with Add/Remove buttons
+            - Multiple intake records can share the same timestamp to represent a single meal
+            - For each nutrition item:
+                - Nutrition (dropdown select from nutrition table)
+                - Nutrition Amount (number input in gram)
+                - Nutrition kCal (auto calculated from selected nutrition)
+                - Remove button (to remove this nutrition item from the form)
+            - The form should keep at least one nutrition item input row by default
+        - Supplement Items Section:
+            - Dynamic list of supplement items with Add/Remove buttons
+            - Multiple supplement_intake records can share the same timestamp
+            - For each supplement item:
+                - Supplement (dropdown select from supplements table)
+                - Supplement Amount (number input, auto-filled with default_amount)
+                - Remove button (to remove this supplement item from the form)
+            - The form should keep at least one supplement item input row by default
+        - Autofill behavior:
+            - When the form is loaded, it should query recent intake records
+              and supplement_intake records for the previous time-window
+            - Pre-populate the nutrition item rows with the same nutrition items and their amounts
+            - Pre-populate the supplement item rows with the same supplement items and their amounts
+            - If there are no previous records, show one empty row for each section
         - Time-window definition: previous_time_window(current_time_window(current_time))
           where current_time_window returns AM (00:00-12:00) or PM (12:00-24:00) based on current time,
           and previous_time_window returns the immediately preceding 12-hour window
           (e.g., if current time is 8:46 AM, current window is AM, previous window is yesterday's PM)
-    4. Supplements Input Form
-        - Timestamp (datetime input)
+    4. Supplements Master Form
         - Supplement Name (text input)
-        - Supplement Amount (number input)
+        - Default Amount (number input, default value = 1)
     5. Event Input Form
         - Timestamp (datetime input)
         - Event Name (text input)
         - Event Notes (textarea input)
-    6. Nutrition Input Form
+    6. Nutrition Master Form
         - Nutrition Name (text input)
         - kCal (number input)
         - Weight in gram (number input)
@@ -100,6 +114,13 @@
 
     Below each form there should be a listing for auditing and editing existing data.
     Each listing show entries for last 24 hours and have option to filter by date range.
+
+    Special case for Intake Input Form:
+    - Two separate Audit & Edit sections:
+        1. "Nutrition" Audit & Edit listing (for intake table records)
+        2. "Supplements" Audit & Edit listing (for supplement_intake table records)
+    - Both listings share the same date range filters
+
 
 # Dashboard
 
