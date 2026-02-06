@@ -66,6 +66,7 @@
                                 <th>+11hr</th>
                                 <th>+12hr</th>
                                 <th>kCal</th>
+                                <th>Supplements</th>
                                 <th>Events</th>
                             </tr>
                         </thead>
@@ -100,6 +101,24 @@
                 <button type="submit">Submit</button>
             </form>
             <div id="glucose-message" class="message"></div>
+            
+            <h3>Recent Entries (Last 24 Hours)</h3>
+            <div class="audit-filters">
+                <label>Start Date: <input type="date" id="glucose-start-filter"></label>
+                <label>End Date: <input type="date" id="glucose-end-filter"></label>
+                <button onclick="loadGlucoseAudit()">Filter</button>
+            </div>
+            <table class="audit-table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Timestamp</th>
+                        <th>Level (mg/dL)</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="glucose-audit-body"></tbody>
+            </table>
         </div>
         
         <!-- Insulin Input Tab -->
@@ -111,22 +130,69 @@
                 <button type="submit">Submit</button>
             </form>
             <div id="insulin-message" class="message"></div>
+            
+            <h3>Recent Entries (Last 24 Hours)</h3>
+            <div class="audit-filters">
+                <label>Start Date: <input type="date" id="insulin-start-filter"></label>
+                <label>End Date: <input type="date" id="insulin-end-filter"></label>
+                <button onclick="loadInsulinAudit()">Filter</button>
+            </div>
+            <table class="audit-table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Timestamp</th>
+                        <th>Level</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="insulin-audit-body"></tbody>
+            </table>
         </div>
         
         <!-- Intake Input Tab -->
         <div id="intake" class="tab-content">
             <h2>Intake Input</h2>
             <form id="intakeForm">
-                <label>Timestamp: <input type="datetime-local" name="timestamp" required></label>
-                <label>Nutrition: 
-                    <select name="nutrition_id" id="nutrition-select" required>
-                        <option value="">Select nutrition...</option>
-                    </select>
-                </label>
-                <label>Amount (gram): <input type="number" name="nutrition_amount" required min="0" step="0.1"></label>
-                <button type="submit">Submit</button>
+                <label>Timestamp: <input type="datetime-local" name="timestamp" id="intake-timestamp" required></label>
+                
+                <div id="nutrition-items-container">
+                    <div class="nutrition-item">
+                        <h3>Nutrition Item 1</h3>
+                        <label>Nutrition: 
+                            <select name="nutrition_id[]" class="nutrition-select" required>
+                                <option value="">Select nutrition...</option>
+                            </select>
+                        </label>
+                        <label>Amount (gram): <input type="number" name="nutrition_amount[]" required min="0" step="0.1"></label>
+                        <button type="button" class="remove-nutrition-btn" style="display:none;">Remove</button>
+                    </div>
+                </div>
+                
+                <button type="button" id="add-nutrition-btn" class="secondary-btn">Add Another Nutrition Item</button>
+                <button type="submit">Submit All</button>
             </form>
             <div id="intake-message" class="message"></div>
+            
+            <h3>Recent Entries (Last 24 Hours)</h3>
+            <div class="audit-filters">
+                <label>Start Date: <input type="date" id="intake-start-filter"></label>
+                <label>End Date: <input type="date" id="intake-end-filter"></label>
+                <button onclick="loadIntakeAudit()">Filter</button>
+            </div>
+            <table class="audit-table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Timestamp</th>
+                        <th>Nutrition</th>
+                        <th>Amount (g)</th>
+                        <th>kCal</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="intake-audit-body"></tbody>
+            </table>
         </div>
         
         <!-- Supplements Input Tab -->
