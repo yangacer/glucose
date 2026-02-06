@@ -197,14 +197,16 @@
         
         <!-- Supplements Input Tab -->
         <div id="supplements" class="tab-content">
-            <h2>Supplements Input</h2>
+            <h2>Supplements Master</h2>
             <form id="supplementsForm">
-                <label>Timestamp: <input type="datetime-local" name="timestamp" required></label>
                 <label>Supplement Name: <input type="text" name="supplement_name" required></label>
-                <label>Supplement Amount: <input type="number" name="supplement_amount" required min="0" step="0.1"></label>
+                <label>Default Amount: <input type="number" name="default_amount" required min="0" step="0.1" value="1"></label>
                 <button type="submit">Submit</button>
             </form>
             <div id="supplements-message" class="message"></div>
+            
+            <h3>Supplements List</h3>
+            <div id="supplements-list"></div>
         </div>
         
         <!-- Event Input Tab -->

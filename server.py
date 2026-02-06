@@ -725,6 +725,9 @@ class GlucoseHandler(http.server.SimpleHTTPRequestHandler):
         self._set_headers()
         self.wfile.write(json.dumps({'success': True}).encode())
     
+    # DELETE handlers
+    def handle_delete_glucose(self, record_id):
+        conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
         cursor.execute('DELETE FROM glucose WHERE id = ?', (record_id,))
         conn.commit()

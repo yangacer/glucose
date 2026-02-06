@@ -15,6 +15,10 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
             loadDashboard();
         } else if (targetTab === 'intake') {
             loadNutritionOptions();
+        } else if (targetTab === 'supplements') {
+            loadSupplementsList();
+        } else if (targetTab === 'nutrition') {
+            loadNutritionList();
         }
     });
 });
@@ -169,14 +173,17 @@ document.getElementById('supplementsForm').addEventListener('submit', async (e) 
     e.preventDefault();
     const formData = new FormData(e.target);
     const data = {
-        timestamp: formData.get('timestamp').replace('T', ' ') + ':00',
         supplement_name: formData.get('supplement_name'),
-        supplement_amount: parseFloat(formData.get('supplement_amount'))
+        default_amount: parseFloat(formData.get('default_amount'))
     };
     
     const result = await submitData('/supplements', data);
     showMessage('supplements-message', result.success, result.message);
-    if (result.success) e.target.reset();
+    if (result.success) {
+        e.target.reset();
+        e.target.querySelector('input[name="default_amount"]').value = '1';
+        loadSupplementsList();
+    }
 });
 
 document.getElementById('eventForm').addEventListener('submit', async (e) => {
@@ -356,6 +363,123 @@ async function loadNutritionList() {
         });
     } catch (err) {
         console.error('Failed to load nutrition list:', err);
+    }
+}
+
+async function loadSupplementsList() {
+    try {
+        const response = await fetch(`${API_BASE}/supplements`);
+        const data = await response.json();
+        
+        const container = document.getElementById('supplements-list');
+        if (data.length === 0) {
+            container.innerHTML = '<p>No supplements found.</p>';
+            return;
+        }
+        
+        let html = '<table><thead><tr><th>ID</th><th>Supplement Name</th><th>Default Amount</th><th>Actions</th></tr></thead><tbody>';
+        
+        data.forEach(item => {
+            html += `
+                <tr>
+                    <td>${item.id}</td>
+                    <td><span class="view-mode">${item.supplement_name}</span>
+                        <input type="text" class="edit-mode" style="display:none;" value="${item.supplement_name}" data-field="supplement_name"></td>
+                    <td><span class="view-mode">${item.default_amount}</span>
+                        <input type="number" class="edit-mode" style="display:none;" value="${item.default_amount}" step="0.1" data-field="default_amount"></td>
+                    <td>
+                        <button class="edit-btn" data-id="${item.id}">Edit</button>
+                        <button class="save-btn" data-id="${item.id}" style="display:none;">Save</button>
+                        <button class="cancel-btn" data-id="${item.id}" style="display:none;">Cancel</button>
+                        <button class="delete-btn" data-id="${item.id}">Delete</button>
+                    </td>
+                </tr>
+            `;
+        });
+        
+        html += '</tbody></table>';
+        container.innerHTML = html;
+        
+        // Add event listeners
+        container.querySelectorAll('.edit-btn').forEach(btn => {
+            btn.addEventListener('click', () => editSupplementRow(btn.dataset.id));
+        });
+        
+        container.querySelectorAll('.save-btn').forEach(btn => {
+            btn.addEventListener('click', () => saveSupplementRow(btn.dataset.id));
+        });
+        
+        container.querySelectorAll('.cancel-btn').forEach(btn => {
+            btn.addEventListener('click', () => cancelSupplementEdit(btn.dataset.id));
+        });
+        
+        container.querySelectorAll('.delete-btn').forEach(btn => {
+            btn.addEventListener('click', () => deleteSupplement(btn.dataset.id));
+        });
+    } catch (err) {
+        console.error('Failed to load supplements list:', err);
+    }
+}
+
+function editSupplementRow(id) {
+    const row = document.querySelector(`button[data-id="${id}"]`).closest('tr');
+    row.querySelectorAll('.view-mode').forEach(el => el.style.display = 'none');
+    row.querySelectorAll('.edit-mode').forEach(el => el.style.display = 'inline');
+    row.querySelector('.edit-btn').style.display = 'none';
+    row.querySelector('.save-btn').style.display = 'inline';
+    row.querySelector('.cancel-btn').style.display = 'inline';
+    row.querySelector('.delete-btn').style.display = 'none';
+}
+
+function cancelSupplementEdit(id) {
+    loadSupplementsList();
+}
+
+async function saveSupplementRow(id) {
+    const row = document.querySelector(`button[data-id="${id}"]`).closest('tr');
+    const data = {};
+    
+    row.querySelectorAll('.edit-mode').forEach(input => {
+        const field = input.dataset.field;
+        data[field] = input.type === 'number' ? parseFloat(input.value) : input.value;
+    });
+    
+    try {
+        const response = await fetch(`${API_BASE}/supplements/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+        
+        if (response.ok) {
+            loadSupplementsList();
+        } else {
+            alert('Failed to update supplement');
+        }
+    } catch (err) {
+        console.error('Failed to update supplement:', err);
+        alert('Failed to update supplement');
+    }
+}
+
+async function deleteSupplement(id) {
+    if (!confirm('Are you sure you want to delete this supplement?')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`${API_BASE}/supplements/${id}`, {
+            method: 'DELETE'
+        });
+        
+        if (response.ok) {
+            loadSupplementsList();
+        } else {
+            alert('Failed to delete supplement');
+        }
+    } catch (err) {
+        console.error('Failed to delete supplement:', err);
+        alert('Failed to delete supplement');
     }
 }
 
