@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Glucose Monitoring Dashboard</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Glucose Monitoring Dashboard</h1>
+        </header>
+        
+        <nav class="tabs">
+            <button class="tab-btn active" data-tab="dashboard">Dashboard</button>
+            <button class="tab-btn" data-tab="glucose">Glucose</button>
+            <button class="tab-btn" data-tab="insulin">Insulin</button>
+            <button class="tab-btn" data-tab="intake">Intake</button>
+            <button class="tab-btn" data-tab="supplements">Supplements</button>
+            <button class="tab-btn" data-tab="event">Event</button>
+            <button class="tab-btn" data-tab="nutrition">Nutrition</button>
+        </nav>
+        
+        <!-- Dashboard Tab -->
+        <div id="dashboard" class="tab-content active">
+            <section class="chart-section">
+                <h2>Glucose Level Chart</h2>
+                <div class="date-filter">
+                    <label>Start Date: <input type="date" id="chart-start-date"></label>
+                    <label>End Date: <input type="date" id="chart-end-date"></label>
+                    <button onclick="loadGlucoseChart()">Update Chart</button>
+                </div>
+                <canvas id="glucoseChart"></canvas>
+            </section>
+            
+            <section class="summary-section">
+                <h2>Summary Timesheet</h2>
+                <div class="date-filter">
+                    <label>Start Date: <input type="date" id="summary-start-date"></label>
+                    <label>End Date: <input type="date" id="summary-end-date"></label>
+                    <button onclick="loadSummary()">Update Summary</button>
+                </div>
+                <div class="table-wrapper">
+                    <table id="summaryTable">
+                        <thead>
+                            <tr>
+                                <th>AM/PM</th>
+                                <th>Date</th>
+                                <th>Dose Time</th>
+                                <th>Intake Time</th>
+                                <th>Dosage</th>
+                                <th>Nutrition</th>
+                                <th>Before</th>
+                                <th>+1hr</th>
+                                <th>+2hr</th>
+                                <th>+3hr</th>
+                                <th>+4hr</th>
+                                <th>+5hr</th>
+                                <th>+6hr</th>
+                                <th>+7hr</th>
+                                <th>+8hr</th>
+                                <th>+9hr</th>
+                                <th>+10hr</th>
+                                <th>+11hr</th>
+                                <th>+12hr</th>
+                                <th>kCal</th>
+                                <th>Events</th>
+                            </tr>
+                        </thead>
+                        <tbody id="summaryBody"></tbody>
+                    </table>
+                </div>
+            </section>
+            
+            <section class="nutrition-list-section">
+                <h2>Nutrition List</h2>
+                <table id="nutritionListTable">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Nutrition Name</th>
+                            <th>kCal</th>
+                            <th>Weight (g)</th>
+                            <th>kCal per gram</th>
+                        </tr>
+                    </thead>
+                    <tbody id="nutritionListBody"></tbody>
+                </table>
+            </section>
+        </div>
+        
+        <!-- Glucose Input Tab -->
+        <div id="glucose" class="tab-content">
+            <h2>Glucose Input</h2>
+            <form id="glucoseForm">
+                <label>Timestamp: <input type="datetime-local" name="timestamp" required></label>
+                <label>Glucose Level (mg/dL): <input type="number" name="level" required min="0"></label>
+                <button type="submit">Submit</button>
+            </form>
+            <div id="glucose-message" class="message"></div>
+        </div>
+        
+        <!-- Insulin Input Tab -->
+        <div id="insulin" class="tab-content">
+            <h2>Insulin Input</h2>
+            <form id="insulinForm">
+                <label>Timestamp: <input type="datetime-local" name="timestamp" required></label>
+                <label>Insulin Level: <input type="number" name="level" required min="0" step="0.1"></label>
+                <button type="submit">Submit</button>
+            </form>
+            <div id="insulin-message" class="message"></div>
+        </div>
+        
+        <!-- Intake Input Tab -->
+        <div id="intake" class="tab-content">
+            <h2>Intake Input</h2>
+            <form id="intakeForm">
+                <label>Timestamp: <input type="datetime-local" name="timestamp" required></label>
+                <label>Nutrition: 
+                    <select name="nutrition_id" id="nutrition-select" required>
+                        <option value="">Select nutrition...</option>
+                    </select>
+                </label>
+                <label>Amount (gram): <input type="number" name="nutrition_amount" required min="0" step="0.1"></label>
+                <button type="submit">Submit</button>
+            </form>
+            <div id="intake-message" class="message"></div>
+        </div>
+        
+        <!-- Supplements Input Tab -->
+        <div id="supplements" class="tab-content">
+            <h2>Supplements Input</h2>
+            <form id="supplementsForm">
+                <label>Timestamp: <input type="datetime-local" name="timestamp" required></label>
+                <label>Supplement Name: <input type="text" name="supplement_name" required></label>
+                <label>Supplement Amount: <input type="number" name="supplement_amount" required min="0" step="0.1"></label>
+                <button type="submit">Submit</button>
+            </form>
+            <div id="supplements-message" class="message"></div>
+        </div>
+        
+        <!-- Event Input Tab -->
+        <div id="event" class="tab-content">
+            <h2>Event Input</h2>
+            <form id="eventForm">
+                <label>Timestamp: <input type="datetime-local" name="timestamp" required></label>
+                <label>Event Name: <input type="text" name="event_name" required></label>
+                <label>Event Notes: <textarea name="event_notes"></textarea></label>
+                <button type="submit">Submit</button>
+            </form>
+            <div id="event-message" class="message"></div>
+        </div>
+        
+        <!-- Nutrition Input Tab -->
+        <div id="nutrition" class="tab-content">
+            <h2>Nutrition Input</h2>
+            <form id="nutritionForm">
+                <label>Nutrition Name: <input type="text" name="nutrition_name" required></label>
+                <label>kCal: <input type="number" name="kcal" required min="0" step="0.01"></label>
+                <label>Weight (gram): <input type="number" name="weight" required min="0" step="0.01"></label>
+                <button type="submit">Submit</button>
+            </form>
+            <div id="nutrition-message" class="message"></div>
+        </div>
+    </div>
+    
+    <script src="app.js"></script>
+</body>
+</html>
