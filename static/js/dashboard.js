@@ -75,10 +75,7 @@ async function loadSummary() {
                 tr.innerHTML = `
                     <td>${row.am_pm}</td>
                     <td>${row.date}</td>
-                    <td>${row.dose_time || '-'}</td>
-                    <td>${row.intake_time || '-'}</td>
                     <td>${row.dosage || '-'}</td>
-                    <td>${row.nutrition || '-'}</td>
                     <td>${row.glucose_levels.before || '-'}</td>
                     <td>${row.glucose_levels['+1hr'] || '-'}</td>
                     <td>${row.glucose_levels['+2hr'] || '-'}</td>
@@ -93,9 +90,11 @@ async function loadSummary() {
                     <td>${row.glucose_levels['+11hr'] || '-'}</td>
                     <td>${row.glucose_levels['+12hr'] || '-'}</td>
                     <td>${row.kcal_intake.toFixed(1)}</td>
-                    <td>${row.grouped_supplements || '-'}</td>
-                    <td>${row.grouped_events || '-'}</td>
                 `;
+                
+                // Add click handler to show overlay
+                tr.addEventListener('click', () => showSummaryOverlay(row));
+                
                 tbody.appendChild(tr);
             }
         });
@@ -103,6 +102,48 @@ async function loadSummary() {
         console.error('Failed to load summary:', err);
     }
 }
+
+/**
+ * Show overlay with detailed information
+ */
+function showSummaryOverlay(row) {
+    // Extract time from timestamp (HH:MM format)
+    const formatTime = (timestamp) => {
+        if (!timestamp || timestamp === '-') return '-';
+        const date = new Date(timestamp);
+        return date.toTimeString().slice(0, 5); // HH:MM
+    };
+    
+    document.getElementById('overlay-dose-time').textContent = formatTime(row.dose_time);
+    document.getElementById('overlay-intake-time').textContent = formatTime(row.intake_time);
+    document.getElementById('overlay-nutritions').textContent = row.nutrition || '-';
+    document.getElementById('overlay-supplements').textContent = row.grouped_supplements || '-';
+    document.getElementById('overlay-events').textContent = row.grouped_events || '-';
+    
+    const overlay = document.getElementById('summaryOverlay');
+    overlay.style.display = 'flex';
+}
+
+/**
+ * Hide overlay
+ */
+function hideSummaryOverlay() {
+    const overlay = document.getElementById('summaryOverlay');
+    overlay.style.display = 'none';
+}
+
+// Setup overlay click handler
+document.addEventListener('DOMContentLoaded', () => {
+    const overlay = document.getElementById('summaryOverlay');
+    if (overlay) {
+        overlay.addEventListener('click', (e) => {
+            // Close overlay when clicking outside the content
+            if (e.target === overlay) {
+                hideSummaryOverlay();
+            }
+        });
+    }
+});
 
 /**
  * Load nutrition list table

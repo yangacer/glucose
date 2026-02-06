@@ -1,8 +1,8 @@
 # Glucose Monitoring System - Session Memo
 
 **Date:** 2026-02-07  
-**Latest Update:** Static Files Refactored for Better Maintainability ✅
-**Session Status:** Frontend and Backend Both Refactored
+**Latest Update:** Summary Timesheet Overlay Feature Implemented ✅
+**Session Status:** Overlay Feature Complete
 
 ## Project Overview
 A web-based glucose monitoring dashboard built with:
@@ -12,7 +12,55 @@ A web-based glucose monitoring dashboard built with:
 
 ## Recent Changes (2026-02-07)
 
-### Latest: Static Files Refactoring ✅
+### Latest: Summary Timesheet Overlay Feature ✅
+
+**Completed:** Implemented interactive overlay for summary timesheet detail view
+
+#### Changes:
+
+1. **Updated design.md:**
+   - Clarified overlay behavior and interaction
+   - Listed visible table columns vs. overlay-only details
+   - Specified timestamp format (HH:MM only)
+
+2. **Modified HTML (static/index.html):**
+   - Removed columns: Dose Time, Intake Time, Nutrition, Supplements, Events from table header
+   - Added overlay div with detail fields positioned over page
+   - Table now shows: AM/PM, Date, Dosage, Glucose levels (Before, +1hr to +12hr), kCal
+
+3. **Updated CSS (static/css/styles.css):**
+   - Added `.overlay` styles with fixed positioning and backdrop
+   - Styled `.overlay-content` as centered floating panel
+   - Added `.detail-row` styles for label-value pairs
+   - Made table rows clickable with hover effect
+
+4. **Enhanced JavaScript (static/js/dashboard.js):**
+   - Modified `loadSummary()` to render fewer columns
+   - Added click event listeners to each row
+   - Implemented `showSummaryOverlay(row)` function:
+     - Extracts HH:MM from timestamps
+     - Populates overlay with dose time, intake time, nutritions, supplements, events
+   - Implemented `hideSummaryOverlay()` function
+   - Added click-outside-to-dismiss handler
+
+**Behavior:**
+- Click any timesheet row → overlay displays with detail information
+- Overlay shows: Dose Time (HH:MM), Intake Time (HH:MM), Nutritions, Supplements, Events
+- Click anywhere outside overlay content → overlay closes
+- Only one row can be selected at a time
+
+**Benefits:**
+- Cleaner, more readable summary table
+- Important glucose data more visible
+- Detail information available on demand
+- Better use of screen space
+- Improved user experience
+
+**Testing:** Server running, all files served correctly ✅
+
+---
+
+### Static Files Refactoring ✅
 
 **Completed:** Refactored monolithic frontend code into modular architecture
 

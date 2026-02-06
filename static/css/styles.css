@@ -308,3 +308,65 @@ section h2 {
     color: #495057;
     font-size: 1.2em;
 }
+
+/* Overlay Styles */
+.overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.overlay-content {
+    background: white;
+    border-radius: 10px;
+    padding: 30px;
+    max-width: 600px;
+    width: 90%;
+    box-shadow: 0 5px 20px rgba(0, 0, 0, 0.3);
+}
+
+.overlay-content h3 {
+    margin-top: 0;
+    margin-bottom: 20px;
+    color: #667eea;
+    border-bottom: 2px solid #667eea;
+    padding-bottom: 10px;
+}
+
+.overlay-details {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.detail-row {
+    display: flex;
+    gap: 10px;
+}
+
+.detail-label {
+    font-weight: bold;
+    color: #495057;
+    min-width: 120px;
+}
+
+.detail-value {
+    color: #212529;
+    flex: 1;
+}
+
+#summaryTable tbody tr {
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+#summaryTable tbody tr:hover {
+    background-color: #f8f9fa;
+}

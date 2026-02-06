@@ -227,21 +227,32 @@ Groups data by 12-hour time windows showing glucose trends and intake informatio
 - Adjustable time range filter (start date and end date)
 - **Default range:** Current month (dynamically calculated based on current date)
 
-**Table Columns:**
+**Table Columns (Visible in Main Table):**
 
 | Column | Description |
 |--------|-------------|
 | **AM/PM** | Time window indicator |
 | **Date** | Calendar date |
-| **Dose Time** | Timestamp of most recent insulin dose in window |
-| **First Intake Time** | Timestamp of earliest intake in window |
 | **Dosage** | Amount of most recent insulin dose |
-| **Nutrition** | Concatenated list of nutrition items with kcal<br>e.g., "Apple (95 kcal), Bread (80 kcal)" |
 | **Glucose Level before intake** | Glucose reading before first intake |
 | **Glucose level +1hr** through **+12hr** | Glucose readings at hourly intervals after first intake |
 | **kCal Intake** | Total kcal sum for the window |
-| **Grouped Supplements** | Concatenated supplement entries with amounts<br>e.g., "Vitamin C 500, Magnesium 200" |
-| **Grouped Events** | Concatenated event names in the window |
+
+**Details Shown in Overlay (Not in Main Table):**
+
+When a row is clicked, an overlay displays the following details:
+- **Dose Time**: Timestamp only (HH:MM format) of most recent insulin dose in window
+- **Intake Time**: Timestamp only (HH:MM format) of earliest intake in window
+- **Nutritions**: Concatenated list of nutrition items with kcal (e.g., "Apple (95 kcal), Bread (80 kcal)")
+- **Supplements**: Concatenated supplement entries with amounts (e.g., "Vitamin C 500, Magnesium 200")
+- **Events**: Concatenated event names in the window
+
+**Overlay Interaction:**
+- Click any timesheet row to display overlay with detail information
+- Overlay appears as a floating panel positioned over the page content
+- Click anywhere outside the overlay to dismiss it
+- Only one row can be selected at a time
+- No multiple row selection supported
 
 **Data Aggregation Rules:**
 - **Dose Time & Dosage:** Query insulin table for most recent record within the same 12-hour window

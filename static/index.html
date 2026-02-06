@@ -48,10 +48,7 @@
                             <tr>
                                 <th>AM/PM</th>
                                 <th>Date</th>
-                                <th>Dose Time</th>
-                                <th>Intake Time</th>
                                 <th>Dosage</th>
-                                <th>Nutrition</th>
                                 <th>Before</th>
                                 <th>+1hr</th>
                                 <th>+2hr</th>
@@ -66,12 +63,39 @@
                                 <th>+11hr</th>
                                 <th>+12hr</th>
                                 <th>kCal</th>
-                                <th>Supplements</th>
-                                <th>Events</th>
                             </tr>
                         </thead>
                         <tbody id="summaryBody"></tbody>
                     </table>
+                    
+                    <!-- Overlay for row details -->
+                    <div id="summaryOverlay" class="overlay" style="display: none;">
+                        <div class="overlay-content">
+                            <h3>Details</h3>
+                            <div class="overlay-details">
+                                <div class="detail-row">
+                                    <span class="detail-label">Dose Time:</span>
+                                    <span id="overlay-dose-time" class="detail-value">-</span>
+                                </div>
+                                <div class="detail-row">
+                                    <span class="detail-label">Intake Time:</span>
+                                    <span id="overlay-intake-time" class="detail-value">-</span>
+                                </div>
+                                <div class="detail-row">
+                                    <span class="detail-label">Nutritions:</span>
+                                    <span id="overlay-nutritions" class="detail-value">-</span>
+                                </div>
+                                <div class="detail-row">
+                                    <span class="detail-label">Supplements:</span>
+                                    <span id="overlay-supplements" class="detail-value">-</span>
+                                </div>
+                                <div class="detail-row">
+                                    <span class="detail-label">Events:</span>
+                                    <span id="overlay-events" class="detail-value">-</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </section>
             
