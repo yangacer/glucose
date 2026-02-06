@@ -1,4 +1,21 @@
 #!/usr/bin/env python3
+"""
+Unit tests for glucose monitoring server API.
+
+This test suite validates all API endpoints and database operations:
+- Nutrition master data (CRUD)
+- Supplements master data (CRUD)
+- Glucose measurements (CRUD)
+- Insulin doses (CRUD)
+- Nutrition intake records (CRUD)
+- Supplement intake records (CRUD)
+- Event records (CRUD)
+- Dashboard endpoints (glucose chart, summary timesheet)
+- Time-window queries (previous intake window)
+- Date range filtering
+
+The tests run against a temporary test database on port 8001.
+"""
 
 import unittest
 import json
@@ -68,8 +85,16 @@ class TestGlucoseAPI(unittest.TestCase):
         cursor.execute('''
         CREATE TABLE supplements (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            timestamp DATETIME NOT NULL,
             supplement_name TEXT NOT NULL,
+            default_amount REAL DEFAULT 1
+        )
+        ''')
+        
+        cursor.execute('''
+        CREATE TABLE supplement_intake (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp DATETIME NOT NULL,
+            supplement_id INTEGER REFERENCES supplements(id),
             supplement_amount REAL NOT NULL
         )
         ''')
@@ -220,12 +245,10 @@ class TestGlucoseAPI(unittest.TestCase):
         self.assertAlmostEqual(record['nutrition_amount'], 150.0, places=1)
     
     def test_09_post_supplements(self):
-        """Test creating supplement record"""
-        timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        """Test creating supplement master record"""
         data = {
-            'timestamp': timestamp,
             'supplement_name': 'Vitamin C',
-            'supplement_amount': 500
+            'default_amount': 1000
         }
         
         status, response = self.make_request('POST', '/api/supplements', data)
@@ -233,7 +256,7 @@ class TestGlucoseAPI(unittest.TestCase):
         self.assertTrue(response.get('success'))
     
     def test_10_get_supplements_list(self):
-        """Test retrieving supplements list"""
+        """Test retrieving supplements master list"""
         status, response = self.make_request('GET', '/api/supplements')
         self.assertEqual(status, 200)
         self.assertIsInstance(response, list)
@@ -241,6 +264,7 @@ class TestGlucoseAPI(unittest.TestCase):
         
         record = response[0]
         self.assertEqual(record['supplement_name'], 'Vitamin C')
+        self.assertEqual(record['default_amount'], 1000)
     
     def test_11_post_event(self):
         """Test creating event record"""
@@ -265,6 +289,34 @@ class TestGlucoseAPI(unittest.TestCase):
         record = response[0]
         self.assertEqual(record['event_name'], 'Morning walk')
         self.assertEqual(record['event_notes'], '30 minutes')
+    
+    def test_12a_post_supplement_intake(self):
+        """Test creating supplement intake record"""
+        # Get supplement ID
+        status, supplement_list = self.make_request('GET', '/api/supplements')
+        supplement_id = supplement_list[0]['id']
+        
+        timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        data = {
+            'timestamp': timestamp,
+            'supplement_id': supplement_id,
+            'supplement_amount': 500
+        }
+        
+        status, response = self.make_request('POST', '/api/supplement-intake', data)
+        self.assertEqual(status, 201)
+        self.assertTrue(response.get('success'))
+    
+    def test_12b_get_supplement_intake_list(self):
+        """Test retrieving supplement intake list"""
+        status, response = self.make_request('GET', '/api/supplement-intake')
+        self.assertEqual(status, 200)
+        self.assertIsInstance(response, list)
+        self.assertGreater(len(response), 0)
+        
+        record = response[0]
+        self.assertEqual(record['supplement_name'], 'Vitamin C')
+        self.assertEqual(record['supplement_amount'], 500)
     
     def test_13_update_glucose(self):
         """Test updating glucose record"""
@@ -333,8 +385,11 @@ class TestGlucoseAPI(unittest.TestCase):
         # Get previous window intake
         status, response = self.make_request('GET', '/api/intake/previous-window')
         self.assertEqual(status, 200)
-        self.assertIsInstance(response, list)
-        self.assertGreater(len(response), 0)
+        self.assertIsInstance(response, dict)
+        self.assertIn('nutrition', response)
+        self.assertIn('supplements', response)
+        self.assertIsInstance(response['nutrition'], list)
+        self.assertIsInstance(response['supplements'], list)
     
     def test_16_get_glucose_chart(self):
         """Test glucose chart data endpoint"""
@@ -380,6 +435,79 @@ class TestGlucoseAPI(unittest.TestCase):
         status, response = self.make_request('POST', '/api/intake', data)
         self.assertEqual(status, 400)
         self.assertIn('error', response)
+    
+    def test_20_update_supplement_master(self):
+        """Test updating supplement master record"""
+        # Get existing record
+        status, records = self.make_request('GET', '/api/supplements')
+        record_id = records[0]['id']
+        
+        data = {
+            'supplement_name': 'Vitamin C 1000mg',
+            'default_amount': 2000
+        }
+        
+        status, response = self.make_request('PUT', f'/api/supplements/{record_id}', data)
+        self.assertEqual(status, 200)
+        self.assertTrue(response.get('success'))
+        
+        # Verify update
+        status, updated_records = self.make_request('GET', '/api/supplements')
+        updated_record = next(r for r in updated_records if r['id'] == record_id)
+        self.assertEqual(updated_record['supplement_name'], 'Vitamin C 1000mg')
+        self.assertEqual(updated_record['default_amount'], 2000)
+    
+    def test_21_update_supplement_intake(self):
+        """Test updating supplement intake record"""
+        # Get existing record
+        status, records = self.make_request('GET', '/api/supplement-intake')
+        record_id = records[0]['id']
+        supplement_id = records[0]['supplement_id']
+        
+        timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        data = {
+            'timestamp': timestamp,
+            'supplement_id': supplement_id,
+            'supplement_amount': 1000
+        }
+        
+        status, response = self.make_request('PUT', f'/api/supplement-intake/{record_id}', data)
+        self.assertEqual(status, 200)
+        self.assertTrue(response.get('success'))
+        
+        # Verify update
+        status, updated_records = self.make_request('GET', '/api/supplement-intake')
+        updated_record = next(r for r in updated_records if r['id'] == record_id)
+        self.assertEqual(updated_record['supplement_amount'], 1000)
+    
+    def test_22_delete_supplement_intake(self):
+        """Test deleting supplement intake record"""
+        # Create a new record to delete
+        status, supplement_list = self.make_request('GET', '/api/supplements')
+        supplement_id = supplement_list[0]['id']
+        
+        timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        data = {
+            'timestamp': timestamp,
+            'supplement_id': supplement_id,
+            'supplement_amount': 250
+        }
+        self.make_request('POST', '/api/supplement-intake', data)
+        
+        # Get the record
+        status, records = self.make_request('GET', '/api/supplement-intake')
+        record_to_delete = records[0]
+        record_id = record_to_delete['id']
+        
+        # Delete it
+        status, response = self.make_request('DELETE', f'/api/supplement-intake/{record_id}')
+        self.assertEqual(status, 200)
+        self.assertTrue(response.get('success'))
+        
+        # Verify deletion
+        status, records_after = self.make_request('GET', '/api/supplement-intake')
+        deleted_exists = any(r['id'] == record_id for r in records_after)
+        self.assertFalse(deleted_exists)
 
 def run_tests_with_server():
     """Run tests with a temporary test server"""
@@ -452,12 +580,21 @@ def run_tests_with_server():
     cursor.execute('''
     CREATE TABLE supplements (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        timestamp DATETIME NOT NULL,
         supplement_name TEXT NOT NULL,
+        default_amount REAL DEFAULT 1
+    )
+    ''')
+    
+    cursor.execute('''
+    CREATE TABLE supplement_intake (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        timestamp DATETIME NOT NULL,
+        supplement_id INTEGER REFERENCES supplements(id),
         supplement_amount REAL NOT NULL
     )
     ''')
-    cursor.execute('CREATE INDEX idx_supplements_timestamp ON supplements(timestamp)')
+    cursor.execute('CREATE INDEX idx_supplement_intake_timestamp ON supplement_intake(timestamp)')
+    cursor.execute('CREATE INDEX idx_supplement_intake_supplement_id ON supplement_intake(supplement_id)')
     
     cursor.execute('''
     CREATE TABLE event (

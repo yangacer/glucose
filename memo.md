@@ -1,8 +1,8 @@
 # Glucose Monitoring System - Session Memo
 
-**Date:** 2026-02-06  
-**Latest Update:** Supplements Feature Implementation Complete ✅
-**Session Status:** Backend Complete - Frontend Implementation Needed
+**Date:** 2026-02-07  
+**Latest Update:** Server Refactored for Better Maintainability ✅
+**Session Status:** Backend Refactored and Tested
 
 ## Project Overview
 A web-based glucose monitoring dashboard built with:
@@ -10,7 +10,50 @@ A web-based glucose monitoring dashboard built with:
 - **Frontend:** Vanilla HTML/CSS/JavaScript with Chart.js
 - **Port:** 8000
 
-## Recent Changes (2026-02-06) - Supplements Feature
+## Recent Changes (2026-02-07) - Server Refactoring ✅
+
+### Major Refactoring Completed
+The `server.py` file has been refactored from a monolithic 807-line file into a well-organized, maintainable codebase with clear separation of concerns:
+
+#### New Code Structure:
+1. **Database Helper Functions** (Lines 15-30)
+   - `get_db_connection()` - Centralized connection management
+   - `execute_query()` - Generic query execution with commit/fetch logic
+
+2. **Business Logic Functions** (Lines 35-160)
+   - `calculate_time_weighted_mean()` - Time-weighted average calculation
+   - `calculate_weekly_mean()` - Weekly glucose data aggregation
+   - `get_previous_time_window()` - 12-hour window calculation
+   - `process_time_window_summary()` - Summary data aggregation
+   - `get_glucose_levels_around_intake()` - Glucose level tracking logic
+
+3. **Data Access Layer** (Lines 165-335)
+   - `DataAccess` class with static methods for all CRUD operations
+   - Separated create/update/delete/read operations
+   - Consistent error handling with ValueError exceptions
+   - Reusable methods reduce code duplication
+
+4. **HTTP Request Handler** (Lines 340-700)
+   - `GlucoseHandler` class - clean routing and request handling
+   - Helper methods: `_send_json()`, `_send_error_json()`
+   - Route dictionary for cleaner GET endpoint mapping
+   - Consistent error handling across all endpoints
+
+#### Benefits of Refactoring:
+- **Maintainability:** Each function has a single, clear responsibility
+- **Testability:** Business logic separated from HTTP layer
+- **Readability:** Clear section headers and logical grouping
+- **Reusability:** Database operations centralized in DataAccess class
+- **Error Handling:** Consistent exception handling throughout
+- **Code Reduction:** Eliminated duplicate code patterns
+
+#### Testing Results:
+- All existing tests pass with same results as before refactoring
+- No breaking changes to API functionality
+- Server starts and runs correctly
+- File size reduced from 807 to 700+ lines with better organization
+
+## Previous Changes (2026-02-06) - Supplements Feature
 
 ### Database Schema Changes ✅
 **Dropped old supplements table** (had: id, timestamp, supplement_name, supplement_amount)
