@@ -1,160 +1,265 @@
-# Tech stack
+# Tech Stack
 
-    1. Database: sqlite3
-    2. Web server: Python3 3.12 built-in http.server
-    3. Frontend: HTML, CSS, JavaScript (Vanilla)
+1. **Database**: SQLite3
+2. **Web Server**: Python 3.12 built-in http.server
+3. **Frontend**: HTML, CSS, JavaScript (Vanilla)
 
-# Table Schema
+# Database Schema
 
-    There will be following tables.
+## Tables Overview
 
-    1. glucose table is consist of timestamp and positive integer value of glucose level
-    2. insulin table is consist of timestamp and positive float point value of insulin level
-    3. intake table is consist of timestamp, id of nutrition, float point value of nutrition amount in gram, and float point value of nutrition amount in kcal
-    4. supplements table is a master table consist of supplement id, string value of supplement name, and float point value of default_amount with default value 1
-    5. supplement_intake table is consist of timestamp, id of supplement, and float point value of supplement amount
-    6. event table is consist of timestamp, string value of event name, and string value of event notes
-    7. nutrition table is consist of nutrition id, string value of nutrition name, float point value of kcal, float point value of weight in gram, and calculated kcal per gram (kcal/weight)
+1. **glucose**: Records glucose level measurements
+2. **insulin**: Records insulin dosing information
+3. **intake**: Records nutrition intake transactions
+4. **supplements**: Master table of predefined supplements
+5. **supplement_intake**: Records supplement intake transactions
+6. **event**: Records events and notes
+7. **nutrition**: Master table of predefined nutrition items
 
-    ```sql
-    CREATE TABLE glucose (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        timestamp DATETIME NOT NULL,
-        level INTEGER NOT NULL
-    );
-    CREATE TABLE insulin (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        timestamp DATETIME NOT NULL,
-        level REAL NOT NULL
-    );
-    CREATE TABLE intake (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        nutrition_id INTEGER REFERENCES nutrition(id),
-        timestamp DATETIME NOT NULL,
-        nutrition_amount REAL NOT NULL,
-        nutrition_kcal REAL NOT NULL
-    );
-    CREATE TABLE supplements (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        supplement_name TEXT NOT NULL,
-        default_amount REAL NOT NULL DEFAULT 1
-    );
-    CREATE TABLE supplement_intake (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        timestamp DATETIME NOT NULL,
-        supplement_id INTEGER REFERENCES supplements(id),
-        supplement_amount REAL NOT NULL
-    );
-    CREATE TABLE event (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        timestamp DATETIME NOT NULL,
-        event_name TEXT NOT NULL,
-        event_notes TEXT
-    );
-    CREATE TABLE nutrition (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        nutrition_name TEXT NOT NULL,
-        kcal REAL NOT NULL,
-        weight REAL NOT NULL,
-        kcal_per_gram REAL GENERATED ALWAYS AS (kcal / weight) STORED
-    );
-    ```
+## Table Definitions
 
-# Form Input
+### 1. glucose
+- `timestamp` (DATETIME): When the glucose level was measured
+- `level` (INTEGER): Glucose level value
 
-    There will be following forms for data input.
+### 2. insulin
+- `timestamp` (DATETIME): When insulin was administered
+- `level` (REAL): Insulin dosage amount
 
-    1. Glucose Input Form
-        - Timestamp (datetime input)
-        - Glucose Level (number input)
-    2. Insulin Input Form
-        - Timestamp (datetime input)
-        - Insulin Level (number input)
-    3. Intake Input Form
-        - Timestamp (datetime input) - shared by all nutrition and supplement items
-        - Nutrition Items Section:
-            - Dynamic list of nutrition items with Add/Remove buttons
-            - Multiple intake records can share the same timestamp to represent a single meal
-            - For each nutrition item:
-                - Nutrition (dropdown select from nutrition table)
-                - Nutrition Amount (number input in gram)
-                - Nutrition kCal (auto calculated from selected nutrition)
-                - Remove button (to remove this nutrition item from the form)
-            - The form should keep at least one nutrition item input row by default
-        - Supplement Items Section:
-            - Dynamic list of supplement items with Add/Remove buttons
-            - Multiple supplement_intake records can share the same timestamp
-            - For each supplement item:
-                - Supplement (dropdown select from supplements table)
-                - Supplement Amount (number input, auto-filled with default_amount)
-                - Remove button (to remove this supplement item from the form)
-            - The form should keep at least one supplement item input row by default
-        - Autofill behavior:
-            - When the form is loaded, it should query recent intake records
-              and supplement_intake records for the previous time-window
-            - Pre-populate the nutrition item rows with the same nutrition items and their amounts
-            - Pre-populate the supplement item rows with the same supplement items and their amounts
-            - If there are no previous records, show one empty row for each section
-        - Time-window definition: previous_time_window(current_time_window(current_time))
-          where current_time_window returns AM (00:00-12:00) or PM (12:00-24:00) based on current time,
-          and previous_time_window returns the immediately preceding 12-hour window
-          (e.g., if current time is 8:46 AM, current window is AM, previous window is yesterday's PM)
-    4. Supplements Master Form
-        - Supplement Name (text input)
-        - Default Amount (number input, default value = 1)
-    5. Event Input Form
-        - Timestamp (datetime input)
-        - Event Name (text input)
-        - Event Notes (textarea input)
-    6. Nutrition Master Form
-        - Nutrition Name (text input)
-        - kCal (number input)
-        - Weight in gram (number input)
-        - kCal per gram will be automatically calculated (kcal/weight)
+### 3. intake
+- `timestamp` (DATETIME): When food was consumed
+- `nutrition_id` (INTEGER): Reference to nutrition table
+- `nutrition_amount` (REAL): Amount in grams
+- `nutrition_kcal` (REAL): Calculated kcal value
 
-    Below each form there should be a listing for auditing and editing existing data.
-    Each listing show entries for last 24 hours and have option to filter by date range.
+### 4. supplements
+- `supplement_name` (TEXT): Name of the supplement
+- `default_amount` (REAL): Default dosage amount (default: 1)
 
-    Special case for Intake Input Form:
-    - Two separate Audit & Edit sections:
-        1. "Nutrition" Audit & Edit listing (for intake table records)
-        2. "Supplements" Audit & Edit listing (for supplement_intake table records)
-    - Both listings share the same date range filters
+### 5. supplement_intake
+- `timestamp` (DATETIME): When supplement was taken
+- `supplement_id` (INTEGER): Reference to supplements table
+- `supplement_amount` (REAL): Amount taken
 
+### 6. event
+- `timestamp` (DATETIME): When the event occurred
+- `event_name` (TEXT): Name of the event
+- `event_notes` (TEXT): Optional notes
 
-# Dashboard
+### 7. nutrition
+- `nutrition_name` (TEXT): Name of the nutrition item
+- `kcal` (REAL): Total kcal value
+- `weight` (REAL): Weight in grams
+- `kcal_per_gram` (REAL): Auto-calculated (kcal / weight)
 
-    The dashboard will display the following data visualizations and summaries.
+## SQL Schema
 
-    1. Glucose Level Charts
-        - Line chart showing weekly time-weighted average glucose levels over time
-        - Time-weighted mean is calculated using trapezoidal rule: sum of (v0 + v1) / 2 * delta_t divided by total time
-        - Support adjustable time range filter (start date and end date)
-        - Default time range: current year (dynamically calculated based on current date)
-    2. Summary time sheet
-        - Table that groups data by non-overlapping 12-hour time windows and shows per hour average glucose level and nutrition intake
-        - Time windows are fixed: 00:00-12:00 (AM) and 12:00-24:00 (PM) for each day
-        - Each row represents one 12-hour window
-        - Assumption: Food intake should occur once per 12-hour period and the intake could be mix of multiple nutrition items with same or similar timestamps
-        - Dose Time: timestamp of the most recent insulin dosing from insulin table within the same 12-hour window
-        - Dosage: level/amount of the most recent insulin dosed within the same 12-hour window
-        - Grouped Events: events concatenated as strings within the 12-hour window
-        - Support adjustable time range filter (start date and end date)
-        - Default time range: current month (dynamically calculated based on current date)
-        - Table columns: AM/PM, Date, Dose Time, First Intake Time, Dosage,
-          Nutrition, Glucose Level before intake, Glucose level after intake
-          +1hr, Glucose level after intake +2hr, Glucose level after intake +3hr,
-          Glucose level after intake +4hr, Glucose level after intake +5hr,
-          Glucose level after intake +6hr, ..., Glucose level after intake +12hr,
-          kCal Intake, Grouped Supplements, Grouped Events
-        - First Intake Time: timestamp of the first (earliest) intake record in the 12-hour window
-        - For the Nutrition column: group all nutrition intake records within the 12-hour window, 
-          and list the individual nutrition items as a concatenated string (e.g., "Apple (95 kcal), Bread (80 kcal)")
-        - For the kCal Intake column: sum all kcal values from nutrition intake records within the 12-hour window
-          to show the total caloric intake for that period
-        - For the Grouped Supplements column: concatenate all supplement entries within the 
-          12-hour window showing name and amount (e.g., "Vitamin C 500, Magnesium 200")
+```sql
+CREATE TABLE glucose (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    timestamp DATETIME NOT NULL,
+    level INTEGER NOT NULL
+);
 
-    6. Nutrition List
-        - Table listing all nutrition items with their kcal, weight, and calculated kcal per gram values
+CREATE TABLE insulin (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    timestamp DATETIME NOT NULL,
+    level REAL NOT NULL
+);
 
+CREATE TABLE intake (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    nutrition_id INTEGER REFERENCES nutrition(id),
+    timestamp DATETIME NOT NULL,
+    nutrition_amount REAL NOT NULL,
+    nutrition_kcal REAL NOT NULL
+);
+
+CREATE TABLE supplements (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    supplement_name TEXT NOT NULL,
+    default_amount REAL NOT NULL DEFAULT 1
+);
+
+CREATE TABLE supplement_intake (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    timestamp DATETIME NOT NULL,
+    supplement_id INTEGER REFERENCES supplements(id),
+    supplement_amount REAL NOT NULL
+);
+
+CREATE TABLE event (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    timestamp DATETIME NOT NULL,
+    event_name TEXT NOT NULL,
+    event_notes TEXT
+);
+
+CREATE TABLE nutrition (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    nutrition_name TEXT NOT NULL,
+    kcal REAL NOT NULL,
+    weight REAL NOT NULL,
+    kcal_per_gram REAL GENERATED ALWAYS AS (kcal / weight) STORED
+);
+```
+
+# User Interface
+
+## Form Inputs
+
+All forms include timestamp autofill functionality and audit/edit listings showing recent entries.
+
+### 1. Glucose Input Form
+**Fields:**
+- Timestamp (datetime-local input, autofilled with current time)
+- Glucose Level (number input)
+
+**Audit & Edit:** Shows last 24 hours of glucose records with date range filter
+
+---
+
+### 2. Insulin Input Form
+**Fields:**
+- Timestamp (datetime-local input, autofilled with current time)
+- Insulin Level (number input)
+
+**Audit & Edit:** Shows last 24 hours of insulin records with date range filter
+
+---
+
+### 3. Intake Input Form
+This form supports multiple nutrition and supplement items sharing the same timestamp.
+
+**Fields:**
+- **Timestamp** (datetime-local input, autofilled with current time) - shared by all items
+
+**Nutrition Items Section:**
+- Dynamic list with Add/Remove buttons (minimum 1 item)
+- For each nutrition item:
+  - Nutrition dropdown (select from nutrition master table)
+  - Amount in grams (number input)
+  - kCal (auto-calculated from selected nutrition)
+  - Remove button
+
+**Supplement Items Section:**
+- Dynamic list with Add/Remove buttons (minimum 1 item)
+- For each supplement item:
+  - Supplement dropdown (select from supplements master table)
+  - Amount (number input, autofilled with default_amount)
+  - Remove button
+
+**Autofill Behavior:**
+- Queries records from the previous time-window
+- Pre-populates nutrition items with same items and amounts
+- Pre-populates supplement items with same items and amounts
+- Time-window definition: `previous_time_window(current_time_window(current_time))`
+  - Current window: AM (00:00-12:00) or PM (12:00-24:00)
+  - Previous window: immediately preceding 12-hour window
+  - Example: if current time is 8:46 AM, previous window is yesterday's PM
+
+**Audit & Edit:** Two separate sections:
+1. **"Nutrition"** listing (intake table records)
+2. **"Supplements"** listing (supplement_intake table records)
+- Both share the same date range filters
+
+---
+
+### 4. Supplements Master Form
+**Fields:**
+- Supplement Name (text input)
+- Default Amount (number input, default value = 1)
+
+**Audit & Edit:** Shows all supplement master records with date range filter
+
+---
+
+### 5. Event Input Form
+**Fields:**
+- Timestamp (datetime-local input, autofilled with current time)
+- Event Name (text input)
+- Event Notes (textarea input)
+
+**Audit & Edit:** Shows last 24 hours of event records with date range filter
+
+---
+
+### 6. Nutrition Master Form
+**Fields:**
+- Nutrition Name (text input)
+- kCal (number input)
+- Weight in grams (number input)
+- kCal per gram (auto-calculated and displayed as kcal/weight)
+
+**Audit & Edit:** Shows all nutrition master records with date range filter
+
+## Dashboard
+
+### 1. Glucose Level Chart
+
+**Visualization:**
+- Line chart showing time-weighted average glucose levels
+
+**Time-Weighted Mean Calculation:**
+- Uses trapezoidal rule: `Σ((v0 + v1) / 2 × Δt) / total_time`
+- Implements the algorithm from `time-weighted-mean.py`
+
+**Features:**
+- Adjustable time range filter (start date and end date)
+- **Default range:** Current year (dynamically calculated based on current date)
+
+---
+
+### 2. Summary Timesheet
+
+**Purpose:**
+Groups data by 12-hour time windows showing glucose trends and intake information.
+
+**Time Window Definition:**
+- Fixed non-overlapping windows: AM (00:00-12:00) and PM (12:00-24:00)
+- Each row represents one 12-hour period
+
+**Assumptions:**
+- Food intake occurs once per 12-hour period
+- Intake may consist of multiple nutrition items with same/similar timestamps
+
+**Features:**
+- Adjustable time range filter (start date and end date)
+- **Default range:** Current month (dynamically calculated based on current date)
+
+**Table Columns:**
+
+| Column | Description |
+|--------|-------------|
+| **AM/PM** | Time window indicator |
+| **Date** | Calendar date |
+| **Dose Time** | Timestamp of most recent insulin dose in window |
+| **First Intake Time** | Timestamp of earliest intake in window |
+| **Dosage** | Amount of most recent insulin dose |
+| **Nutrition** | Concatenated list of nutrition items with kcal<br>e.g., "Apple (95 kcal), Bread (80 kcal)" |
+| **Glucose Level before intake** | Glucose reading before first intake |
+| **Glucose level +1hr** through **+12hr** | Glucose readings at hourly intervals after first intake |
+| **kCal Intake** | Total kcal sum for the window |
+| **Grouped Supplements** | Concatenated supplement entries with amounts<br>e.g., "Vitamin C 500, Magnesium 200" |
+| **Grouped Events** | Concatenated event names in the window |
+
+**Data Aggregation Rules:**
+- **Dose Time & Dosage:** Query insulin table for most recent record within the same 12-hour window
+- **First Intake Time:** Earliest intake timestamp in the window
+- **Nutrition:** All nutrition intake records grouped and concatenated
+- **kCal Intake:** Sum of all nutrition_kcal values in the window
+- **Grouped Supplements:** All supplement_intake records concatenated with name and amount
+- **Grouped Events:** All event records concatenated as strings
+
+---
+
+### 3. Nutrition List
+
+**Display:**
+Table listing all nutrition master records
+
+**Columns:**
+- Nutrition Name
+- kCal
+- Weight (grams)
+- kCal per gram (calculated value)
