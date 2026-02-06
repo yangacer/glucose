@@ -156,9 +156,10 @@
             <form id="intakeForm">
                 <label>Timestamp: <input type="datetime-local" name="timestamp" id="intake-timestamp" required></label>
                 
+                <h3>Nutrition Items</h3>
                 <div id="nutrition-items-container">
                     <div class="nutrition-item">
-                        <h3>Nutrition Item 1</h3>
+                        <h4>Nutrition Item 1</h4>
                         <label>Nutrition: 
                             <select name="nutrition_id[]" class="nutrition-select" required>
                                 <option value="">Select nutrition...</option>
@@ -168,13 +169,28 @@
                         <button type="button" class="remove-nutrition-btn" style="display:none;">Remove</button>
                     </div>
                 </div>
-                
                 <button type="button" id="add-nutrition-btn" class="secondary-btn">Add Another Nutrition Item</button>
+                
+                <h3>Supplement Items</h3>
+                <div id="supplement-items-container">
+                    <div class="supplement-item">
+                        <h4>Supplement Item 1</h4>
+                        <label>Supplement: 
+                            <select name="supplement_id[]" class="supplement-select" required>
+                                <option value="">Select supplement...</option>
+                            </select>
+                        </label>
+                        <label>Amount: <input type="number" name="supplement_amount[]" required min="0" step="0.1"></label>
+                        <button type="button" class="remove-supplement-btn" style="display:none;">Remove</button>
+                    </div>
+                </div>
+                <button type="button" id="add-supplement-btn" class="secondary-btn">Add Another Supplement</button>
+                
                 <button type="submit">Submit All</button>
             </form>
             <div id="intake-message" class="message"></div>
             
-            <h3>Recent Entries (Last 24 Hours)</h3>
+            <h3>Nutrition - Recent Entries (Last 24 Hours)</h3>
             <div class="audit-filters">
                 <label>Start Date: <input type="date" id="intake-start-filter"></label>
                 <label>End Date: <input type="date" id="intake-end-filter"></label>
@@ -192,6 +208,25 @@
                     </tr>
                 </thead>
                 <tbody id="intake-audit-body"></tbody>
+            </table>
+            
+            <h3>Supplements - Recent Entries (Last 24 Hours)</h3>
+            <div class="audit-filters">
+                <label>Start Date: <input type="date" id="supplement-intake-start-filter"></label>
+                <label>End Date: <input type="date" id="supplement-intake-end-filter"></label>
+                <button onclick="loadSupplementIntakeAudit()">Filter</button>
+            </div>
+            <table class="audit-table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Timestamp</th>
+                        <th>Supplement</th>
+                        <th>Amount</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="supplement-intake-audit-body"></tbody>
             </table>
         </div>
         
@@ -219,6 +254,25 @@
                 <button type="submit">Submit</button>
             </form>
             <div id="event-message" class="message"></div>
+            
+            <h3>Recent Entries (Last 24 Hours)</h3>
+            <div class="audit-filters">
+                <label>Start Date: <input type="date" id="event-start-filter"></label>
+                <label>End Date: <input type="date" id="event-end-filter"></label>
+                <button onclick="loadEventAudit()">Filter</button>
+            </div>
+            <table class="audit-table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Timestamp</th>
+                        <th>Event Name</th>
+                        <th>Event Notes</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="event-audit-body"></tbody>
+            </table>
         </div>
         
         <!-- Nutrition Input Tab -->
@@ -231,6 +285,21 @@
                 <button type="submit">Submit</button>
             </form>
             <div id="nutrition-message" class="message"></div>
+            
+            <h3>Recent Entries</h3>
+            <table class="audit-table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Nutrition Name</th>
+                        <th>kCal</th>
+                        <th>Weight (g)</th>
+                        <th>kCal per gram</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="nutrition-audit-body"></tbody>
+            </table>
         </div>
     </div>
     

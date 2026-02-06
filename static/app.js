@@ -15,10 +15,14 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
             loadDashboard();
         } else if (targetTab === 'intake') {
             loadNutritionOptions();
+            loadSupplementOptions();
         } else if (targetTab === 'supplements') {
             loadSupplementsList();
         } else if (targetTab === 'nutrition') {
             loadNutritionList();
+            loadNutritionAudit();
+        } else if (targetTab === 'event') {
+            loadEventAudit();
         }
     });
 });
@@ -68,6 +72,7 @@ document.getElementById('insulinForm').addEventListener('submit', async (e) => {
 
 // Dynamic nutrition items for intake form
 let nutritionItemCount = 1;
+let supplementItemCount = 1;
 
 document.getElementById('add-nutrition-btn').addEventListener('click', () => {
     nutritionItemCount++;
@@ -75,7 +80,7 @@ document.getElementById('add-nutrition-btn').addEventListener('click', () => {
     const newItem = document.createElement('div');
     newItem.className = 'nutrition-item';
     newItem.innerHTML = `
-        <h3>Nutrition Item ${nutritionItemCount}</h3>
+        <h4>Nutrition Item ${nutritionItemCount}</h4>
         <label>Nutrition: 
             <select name="nutrition_id[]" class="nutrition-select" required>
                 <option value="">Select nutrition...</option>
@@ -90,17 +95,48 @@ document.getElementById('add-nutrition-btn').addEventListener('click', () => {
     loadNutritionOptionsForSelect(newItem.querySelector('.nutrition-select'));
     
     // Update remove button visibility
-    updateRemoveButtons();
+    updateNutritionRemoveButtons();
     
     // Add event listener to new remove button
     newItem.querySelector('.remove-nutrition-btn').addEventListener('click', function() {
         newItem.remove();
-        updateRemoveButtons();
+        updateNutritionRemoveButtons();
         renumberNutritionItems();
     });
 });
 
-function updateRemoveButtons() {
+document.getElementById('add-supplement-btn').addEventListener('click', () => {
+    supplementItemCount++;
+    const container = document.getElementById('supplement-items-container');
+    const newItem = document.createElement('div');
+    newItem.className = 'supplement-item';
+    newItem.innerHTML = `
+        <h4>Supplement Item ${supplementItemCount}</h4>
+        <label>Supplement: 
+            <select name="supplement_id[]" class="supplement-select" required>
+                <option value="">Select supplement...</option>
+            </select>
+        </label>
+        <label>Amount: <input type="number" name="supplement_amount[]" required min="0" step="0.1"></label>
+        <button type="button" class="remove-supplement-btn">Remove</button>
+    `;
+    container.appendChild(newItem);
+    
+    // Load supplement options for new select
+    loadSupplementOptionsForSelect(newItem.querySelector('.supplement-select'));
+    
+    // Update remove button visibility
+    updateSupplementRemoveButtons();
+    
+    // Add event listener to new remove button
+    newItem.querySelector('.remove-supplement-btn').addEventListener('click', function() {
+        newItem.remove();
+        updateSupplementRemoveButtons();
+        renumberSupplementItems();
+    });
+});
+
+function updateNutritionRemoveButtons() {
     const items = document.querySelectorAll('.nutrition-item');
     items.forEach(item => {
         const removeBtn = item.querySelector('.remove-nutrition-btn');
@@ -112,12 +148,32 @@ function updateRemoveButtons() {
     });
 }
 
+function updateSupplementRemoveButtons() {
+    const items = document.querySelectorAll('.supplement-item');
+    items.forEach(item => {
+        const removeBtn = item.querySelector('.remove-supplement-btn');
+        if (items.length > 1) {
+            removeBtn.style.display = 'inline-block';
+        } else {
+            removeBtn.style.display = 'none';
+        }
+    });
+}
+
 function renumberNutritionItems() {
     const items = document.querySelectorAll('.nutrition-item');
     items.forEach((item, index) => {
-        item.querySelector('h3').textContent = `Nutrition Item ${index + 1}`;
+        item.querySelector('h4').textContent = `Nutrition Item ${index + 1}`;
     });
     nutritionItemCount = items.length;
+}
+
+function renumberSupplementItems() {
+    const items = document.querySelectorAll('.supplement-item');
+    items.forEach((item, index) => {
+        item.querySelector('h4').textContent = `Supplement Item ${index + 1}`;
+    });
+    supplementItemCount = items.length;
 }
 
 document.getElementById('intakeForm').addEventListener('submit', async (e) => {
@@ -126,33 +182,55 @@ document.getElementById('intakeForm').addEventListener('submit', async (e) => {
     const timestamp = formData.get('timestamp').replace('T', ' ') + ':00';
     const nutritionIds = formData.getAll('nutrition_id[]');
     const nutritionAmounts = formData.getAll('nutrition_amount[]');
+    const supplementIds = formData.getAll('supplement_id[]');
+    const supplementAmounts = formData.getAll('supplement_amount[]');
     
     let allSuccess = true;
     let messages = [];
     
     // Submit each nutrition item separately with the same timestamp
     for (let i = 0; i < nutritionIds.length; i++) {
-        const data = {
-            timestamp: timestamp,
-            nutrition_id: parseInt(nutritionIds[i]),
-            nutrition_amount: parseFloat(nutritionAmounts[i])
-        };
-        
-        const result = await submitData('/intake', data);
-        if (!result.success) {
-            allSuccess = false;
-            messages.push(`Item ${i + 1}: ${result.message}`);
+        if (nutritionIds[i]) {  // Only submit if a nutrition was selected
+            const data = {
+                timestamp: timestamp,
+                nutrition_id: parseInt(nutritionIds[i]),
+                nutrition_amount: parseFloat(nutritionAmounts[i])
+            };
+            
+            const result = await submitData('/intake', data);
+            if (!result.success) {
+                allSuccess = false;
+                messages.push(`Nutrition Item ${i + 1}: ${result.message}`);
+            }
+        }
+    }
+    
+    // Submit each supplement item separately with the same timestamp
+    for (let i = 0; i < supplementIds.length; i++) {
+        if (supplementIds[i]) {  // Only submit if a supplement was selected
+            const data = {
+                timestamp: timestamp,
+                supplement_id: parseInt(supplementIds[i]),
+                supplement_amount: parseFloat(supplementAmounts[i])
+            };
+            
+            const result = await submitData('/supplement-intake', data);
+            if (!result.success) {
+                allSuccess = false;
+                messages.push(`Supplement Item ${i + 1}: ${result.message}`);
+            }
         }
     }
     
     if (allSuccess) {
-        showMessage('intake-message', true, `Successfully submitted ${nutritionIds.length} nutrition item(s)!`);
+        const totalItems = nutritionIds.filter(id => id).length + supplementIds.filter(id => id).length;
+        showMessage('intake-message', true, `Successfully submitted ${totalItems} item(s)!`);
         e.target.reset();
-        // Reset to single item
-        const container = document.getElementById('nutrition-items-container');
-        container.innerHTML = `
+        // Reset to single item for each section
+        const nutritionContainer = document.getElementById('nutrition-items-container');
+        nutritionContainer.innerHTML = `
             <div class="nutrition-item">
-                <h3>Nutrition Item 1</h3>
+                <h4>Nutrition Item 1</h4>
                 <label>Nutrition: 
                     <select name="nutrition_id[]" class="nutrition-select" required>
                         <option value="">Select nutrition...</option>
@@ -162,8 +240,25 @@ document.getElementById('intakeForm').addEventListener('submit', async (e) => {
                 <button type="button" class="remove-nutrition-btn" style="display:none;">Remove</button>
             </div>
         `;
+        
+        const supplementContainer = document.getElementById('supplement-items-container');
+        supplementContainer.innerHTML = `
+            <div class="supplement-item">
+                <h4>Supplement Item 1</h4>
+                <label>Supplement: 
+                    <select name="supplement_id[]" class="supplement-select" required>
+                        <option value="">Select supplement...</option>
+                    </select>
+                </label>
+                <label>Amount: <input type="number" name="supplement_amount[]" required min="0" step="0.1"></label>
+                <button type="button" class="remove-supplement-btn" style="display:none;">Remove</button>
+            </div>
+        `;
+        
         nutritionItemCount = 1;
+        supplementItemCount = 1;
         loadNutritionOptions();
+        loadSupplementOptions();
     } else {
         showMessage('intake-message', false, 'Some items failed: ' + messages.join(', '));
     }
@@ -520,6 +615,67 @@ async function loadNutritionOptionsForSelect(selectElement) {
     }
 }
 
+async function loadSupplementOptions() {
+    try {
+        const response = await fetch(`${API_BASE}/supplements`);
+        const data = await response.json();
+        
+        const selects = document.querySelectorAll('.supplement-select');
+        selects.forEach(select => {
+            select.innerHTML = '<option value="">Select supplement...</option>';
+            data.forEach(item => {
+                const option = document.createElement('option');
+                option.value = item.id;
+                option.textContent = item.supplement_name;
+                option.dataset.defaultAmount = item.default_amount;
+                select.appendChild(option);
+            });
+        });
+        
+        // Add event listeners to update amount when supplement is selected
+        selects.forEach(select => {
+            select.addEventListener('change', function() {
+                const selectedOption = this.options[this.selectedIndex];
+                const defaultAmount = selectedOption.dataset.defaultAmount;
+                if (defaultAmount) {
+                    const amountInput = this.closest('.supplement-item').querySelector('input[name="supplement_amount[]"]');
+                    amountInput.value = defaultAmount;
+                }
+            });
+        });
+    } catch (err) {
+        console.error('Failed to load supplement options:', err);
+    }
+}
+
+async function loadSupplementOptionsForSelect(selectElement) {
+    try {
+        const response = await fetch(`${API_BASE}/supplements`);
+        const data = await response.json();
+        
+        selectElement.innerHTML = '<option value="">Select supplement...</option>';
+        data.forEach(item => {
+            const option = document.createElement('option');
+            option.value = item.id;
+            option.textContent = item.supplement_name;
+            option.dataset.defaultAmount = item.default_amount;
+            selectElement.appendChild(option);
+        });
+        
+        // Add event listener to update amount when supplement is selected
+        selectElement.addEventListener('change', function() {
+            const selectedOption = this.options[this.selectedIndex];
+            const defaultAmount = selectedOption.dataset.defaultAmount;
+            if (defaultAmount) {
+                const amountInput = this.closest('.supplement-item').querySelector('input[name="supplement_amount[]"]');
+                amountInput.value = defaultAmount;
+            }
+        });
+    } catch (err) {
+        console.error('Failed to load supplement options:', err);
+    }
+}
+
 // Auto-fill current timestamp for all datetime inputs
 function setCurrentTimestamp() {
     const now = new Date();
@@ -736,45 +892,118 @@ async function deleteIntake(id) {
 // Autofill from previous window
 async function autofillPreviousIntake() {
     try {
+        // Load both nutrition and supplements from previous window
         const response = await fetch(`${API_BASE}/intake/previous-window`);
         const data = await response.json();
         
-        if (data.length === 0) {
-            return;
-        }
+        const nutritionData = data.nutrition || [];
+        const supplementData = data.supplements || [];
         
-        const container = document.getElementById('nutrition-items-container');
-        container.innerHTML = '';
+        // Populate nutrition items
+        const nutritionContainer = document.getElementById('nutrition-items-container');
+        nutritionContainer.innerHTML = '';
         nutritionItemCount = 0;
         
-        data.forEach((item, index) => {
-            nutritionItemCount++;
+        if (nutritionData.length === 0) {
+            // Add at least one empty row
+            nutritionItemCount = 1;
             const newItem = document.createElement('div');
             newItem.className = 'nutrition-item';
             newItem.innerHTML = `
-                <h3>Nutrition Item ${nutritionItemCount}</h3>
+                <h4>Nutrition Item 1</h4>
                 <label>Nutrition: 
                     <select name="nutrition_id[]" class="nutrition-select" required>
                         <option value="">Select nutrition...</option>
                     </select>
                 </label>
-                <label>Amount (gram): <input type="number" name="nutrition_amount[]" required min="0" step="0.1" value="${item.nutrition_amount}"></label>
-                <button type="button" class="remove-nutrition-btn">Remove</button>
+                <label>Amount (gram): <input type="number" name="nutrition_amount[]" required min="0" step="0.1"></label>
+                <button type="button" class="remove-nutrition-btn" style="display:none;">Remove</button>
             `;
-            container.appendChild(newItem);
-            
-            loadNutritionOptionsForSelect(newItem.querySelector('.nutrition-select')).then(() => {
-                newItem.querySelector('.nutrition-select').value = item.nutrition_id;
+            nutritionContainer.appendChild(newItem);
+            loadNutritionOptionsForSelect(newItem.querySelector('.nutrition-select'));
+        } else {
+            nutritionData.forEach((item, index) => {
+                nutritionItemCount++;
+                const newItem = document.createElement('div');
+                newItem.className = 'nutrition-item';
+                newItem.innerHTML = `
+                    <h4>Nutrition Item ${nutritionItemCount}</h4>
+                    <label>Nutrition: 
+                        <select name="nutrition_id[]" class="nutrition-select" required>
+                            <option value="">Select nutrition...</option>
+                        </select>
+                    </label>
+                    <label>Amount (gram): <input type="number" name="nutrition_amount[]" required min="0" step="0.1" value="${item.nutrition_amount}"></label>
+                    <button type="button" class="remove-nutrition-btn">Remove</button>
+                `;
+                nutritionContainer.appendChild(newItem);
+                
+                loadNutritionOptionsForSelect(newItem.querySelector('.nutrition-select')).then(() => {
+                    newItem.querySelector('.nutrition-select').value = item.nutrition_id;
+                });
+                
+                newItem.querySelector('.remove-nutrition-btn').addEventListener('click', function() {
+                    newItem.remove();
+                    updateNutritionRemoveButtons();
+                    renumberNutritionItems();
+                });
             });
-            
-            newItem.querySelector('.remove-nutrition-btn').addEventListener('click', function() {
-                newItem.remove();
-                updateRemoveButtons();
-                renumberNutritionItems();
-            });
-        });
+        }
         
-        updateRemoveButtons();
+        updateNutritionRemoveButtons();
+        
+        // Populate supplement items
+        const supplementContainer = document.getElementById('supplement-items-container');
+        supplementContainer.innerHTML = '';
+        supplementItemCount = 0;
+        
+        if (supplementData.length === 0) {
+            // Add at least one empty row
+            supplementItemCount = 1;
+            const newItem = document.createElement('div');
+            newItem.className = 'supplement-item';
+            newItem.innerHTML = `
+                <h4>Supplement Item 1</h4>
+                <label>Supplement: 
+                    <select name="supplement_id[]" class="supplement-select" required>
+                        <option value="">Select supplement...</option>
+                    </select>
+                </label>
+                <label>Amount: <input type="number" name="supplement_amount[]" required min="0" step="0.1"></label>
+                <button type="button" class="remove-supplement-btn" style="display:none;">Remove</button>
+            `;
+            supplementContainer.appendChild(newItem);
+            loadSupplementOptionsForSelect(newItem.querySelector('.supplement-select'));
+        } else {
+            supplementData.forEach((item, index) => {
+                supplementItemCount++;
+                const newItem = document.createElement('div');
+                newItem.className = 'supplement-item';
+                newItem.innerHTML = `
+                    <h4>Supplement Item ${supplementItemCount}</h4>
+                    <label>Supplement: 
+                        <select name="supplement_id[]" class="supplement-select" required>
+                            <option value="">Select supplement...</option>
+                        </select>
+                    </label>
+                    <label>Amount: <input type="number" name="supplement_amount[]" required min="0" step="0.1" value="${item.supplement_amount}"></label>
+                    <button type="button" class="remove-supplement-btn">Remove</button>
+                `;
+                supplementContainer.appendChild(newItem);
+                
+                loadSupplementOptionsForSelect(newItem.querySelector('.supplement-select')).then(() => {
+                    newItem.querySelector('.supplement-select').value = item.supplement_id;
+                });
+                
+                newItem.querySelector('.remove-supplement-btn').addEventListener('click', function() {
+                    newItem.remove();
+                    updateSupplementRemoveButtons();
+                    renumberSupplementItems();
+                });
+            });
+        }
+        
+        updateSupplementRemoveButtons();
     } catch (err) {
         console.error('Failed to autofill previous intake:', err);
     }
@@ -792,8 +1021,138 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
                 loadInsulinAudit();
             } else if (targetTab === 'intake') {
                 loadIntakeAudit();
+                loadSupplementIntakeAudit();
                 autofillPreviousIntake();
             }
         }, 100);
     });
 });
+
+async function loadSupplementIntakeAudit() {
+    const startDate = document.getElementById('supplement-intake-start-filter').value;
+    const endDate = document.getElementById('supplement-intake-end-filter').value;
+    
+    let url = `${API_BASE}/supplement-intake`;
+    if (startDate && endDate) {
+        url += `?start_date=${startDate}&end_date=${endDate}`;
+    }
+    
+    const response = await fetch(url);
+    const data = await response.json();
+    
+    const tbody = document.getElementById('supplement-intake-audit-body');
+    tbody.innerHTML = '';
+    
+    data.forEach(record => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td>${record.id}</td>
+            <td>${record.timestamp}</td>
+            <td>${record.supplement_name}</td>
+            <td>${record.supplement_amount}</td>
+            <td>
+                <button class="delete-btn" onclick="deleteSupplementIntake(${record.id})">Delete</button>
+            </td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
+
+async function deleteSupplementIntake(id) {
+    if (confirm('Are you sure you want to delete this record?')) {
+        const response = await fetch(`${API_BASE}/supplement-intake/${id}`, {
+            method: 'DELETE'
+        });
+        
+        if (response.ok) {
+            alert('Record deleted successfully!');
+            loadSupplementIntakeAudit();
+        } else {
+            alert('Failed to delete record');
+        }
+    }
+}
+
+async function loadEventAudit() {
+    const startDate = document.getElementById('event-start-filter').value;
+    const endDate = document.getElementById('event-end-filter').value;
+    
+    let url = `${API_BASE}/event`;
+    if (startDate && endDate) {
+        url += `?start_date=${startDate}&end_date=${endDate}`;
+    }
+    
+    const response = await fetch(url);
+    const data = await response.json();
+    
+    const tbody = document.getElementById('event-audit-body');
+    tbody.innerHTML = '';
+    
+    data.forEach(record => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td>${record.id}</td>
+            <td>${record.timestamp}</td>
+            <td>${record.event_name}</td>
+            <td>${record.event_notes || ''}</td>
+            <td>
+                <button class="delete-btn" onclick="deleteEvent(${record.id})">Delete</button>
+            </td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
+
+async function deleteEvent(id) {
+    if (confirm('Are you sure you want to delete this record?')) {
+        const response = await fetch(`${API_BASE}/event/${id}`, {
+            method: 'DELETE'
+        });
+        
+        if (response.ok) {
+            alert('Record deleted successfully!');
+            loadEventAudit();
+        } else {
+            alert('Failed to delete record');
+        }
+    }
+}
+
+async function loadNutritionAudit() {
+    const response = await fetch(`${API_BASE}/nutrition`);
+    const data = await response.json();
+    
+    const tbody = document.getElementById('nutrition-audit-body');
+    tbody.innerHTML = '';
+    
+    data.forEach(record => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td>${record.id}</td>
+            <td>${record.nutrition_name}</td>
+            <td>${record.kcal}</td>
+            <td>${record.weight}</td>
+            <td>${record.kcal_per_gram.toFixed(4)}</td>
+            <td>
+                <button class="delete-btn" onclick="deleteNutritionItem(${record.id})">Delete</button>
+            </td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
+
+async function deleteNutritionItem(id) {
+    if (confirm('Are you sure you want to delete this nutrition item?')) {
+        const response = await fetch(`${API_BASE}/nutrition/${id}`, {
+            method: 'DELETE'
+        });
+        
+        if (response.ok) {
+            alert('Record deleted successfully!');
+            loadNutritionAudit();
+            loadNutritionList();
+        } else {
+            alert('Failed to delete record');
+        }
+    }
+}
