@@ -131,12 +131,12 @@ form button.secondary-btn:hover {
     font-size: 1em;
 }
 
-.remove-nutrition-btn {
+.remove-nutrition-btn, .remove-supplement-btn {
     background: #dc3545 !important;
     margin-top: 10px;
 }
 
-.remove-nutrition-btn:hover {
+.remove-nutrition-btn:hover, .remove-supplement-btn:hover {
     background: #c82333 !important;
 }
 

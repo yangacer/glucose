@@ -109,7 +109,7 @@ document.getElementById('add-supplement-btn').addEventListener('click', () => {
     supplementItemCount++;
     const container = document.getElementById('supplement-items-container');
     const newItem = document.createElement('div');
-    newItem.className = 'supplement-item';
+    newItem.className = 'supplement-item nutrition-item';
     newItem.innerHTML = `
         <h4>Supplement Item ${supplementItemCount}</h4>
         <label>Supplement: 
@@ -961,7 +961,7 @@ async function autofillPreviousIntake() {
             // Add at least one empty row
             supplementItemCount = 1;
             const newItem = document.createElement('div');
-            newItem.className = 'supplement-item';
+            newItem.className = 'supplement-item nutrition-item';
             newItem.innerHTML = `
                 <h4>Supplement Item 1</h4>
                 <label>Supplement: 
@@ -978,7 +978,7 @@ async function autofillPreviousIntake() {
             supplementData.forEach((item, index) => {
                 supplementItemCount++;
                 const newItem = document.createElement('div');
-                newItem.className = 'supplement-item';
+                newItem.className = 'supplement-item nutrition-item';
                 newItem.innerHTML = `
                     <h4>Supplement Item ${supplementItemCount}</h4>
                     <label>Supplement: 
