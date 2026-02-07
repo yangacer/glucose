@@ -3,6 +3,31 @@
 let glucoseChart = null;
 
 /**
+ * Get color styling for glucose level
+ */
+function getGlucoseColor(level) {
+    if (!level || level === '-') return { background: '', color: '' };
+    
+    const glucose = parseFloat(level);
+    
+    if (glucose >= 500) {
+        return { background: '#000000', color: '#FFFFFF' };
+    } else if (glucose >= 400) {
+        return { background: '#FF0000', color: '#FFFFFF' };
+    } else if (glucose >= 300) {
+        return { background: '#FF00FF', color: '#FFFFFF' };
+    } else if (glucose >= 200) {
+        return { background: '#FFB6FF', color: '#000000' };
+    } else if (glucose > 100) {
+        return { background: '#98fab2', color: '#000000' };
+    } else if (glucose >= 60) {
+        return { background: '#6eb882', color: '#000000' };
+    } else {
+        return { background: '#FFFF00', color: '#FF0000' };
+    }
+}
+
+/**
  * Load all dashboard components
  */
 async function loadDashboard() {
@@ -72,25 +97,40 @@ async function loadSummary() {
         data.forEach(row => {
             if (row) {
                 const tr = document.createElement('tr');
-                tr.innerHTML = `
-                    <td>${row.am_pm}</td>
-                    <td>${row.date}</td>
-                    <td>${row.dosage || '-'}</td>
-                    <td>${row.glucose_levels.before || '-'}</td>
-                    <td>${row.glucose_levels['+1hr'] || '-'}</td>
-                    <td>${row.glucose_levels['+2hr'] || '-'}</td>
-                    <td>${row.glucose_levels['+3hr'] || '-'}</td>
-                    <td>${row.glucose_levels['+4hr'] || '-'}</td>
-                    <td>${row.glucose_levels['+5hr'] || '-'}</td>
-                    <td>${row.glucose_levels['+6hr'] || '-'}</td>
-                    <td>${row.glucose_levels['+7hr'] || '-'}</td>
-                    <td>${row.glucose_levels['+8hr'] || '-'}</td>
-                    <td>${row.glucose_levels['+9hr'] || '-'}</td>
-                    <td>${row.glucose_levels['+10hr'] || '-'}</td>
-                    <td>${row.glucose_levels['+11hr'] || '-'}</td>
-                    <td>${row.glucose_levels['+12hr'] || '-'}</td>
-                    <td>${row.kcal_intake.toFixed(1)}</td>
-                `;
+                
+                // Create cells
+                const cells = [
+                    { value: row.am_pm, isGlucose: false },
+                    { value: row.date, isGlucose: false },
+                    { value: row.dosage || '-', isGlucose: false },
+                    { value: row.glucose_levels.before || '-', isGlucose: true },
+                    { value: row.glucose_levels['+1hr'] || '-', isGlucose: true },
+                    { value: row.glucose_levels['+2hr'] || '-', isGlucose: true },
+                    { value: row.glucose_levels['+3hr'] || '-', isGlucose: true },
+                    { value: row.glucose_levels['+4hr'] || '-', isGlucose: true },
+                    { value: row.glucose_levels['+5hr'] || '-', isGlucose: true },
+                    { value: row.glucose_levels['+6hr'] || '-', isGlucose: true },
+                    { value: row.glucose_levels['+7hr'] || '-', isGlucose: true },
+                    { value: row.glucose_levels['+8hr'] || '-', isGlucose: true },
+                    { value: row.glucose_levels['+9hr'] || '-', isGlucose: true },
+                    { value: row.glucose_levels['+10hr'] || '-', isGlucose: true },
+                    { value: row.glucose_levels['+11hr'] || '-', isGlucose: true },
+                    { value: row.glucose_levels['+12hr'] || '-', isGlucose: true },
+                    { value: row.kcal_intake.toFixed(1), isGlucose: false }
+                ];
+                
+                cells.forEach(cell => {
+                    const td = document.createElement('td');
+                    td.textContent = cell.value;
+                    
+                    if (cell.isGlucose && cell.value !== '-') {
+                        const colors = getGlucoseColor(cell.value);
+                        td.style.backgroundColor = colors.background;
+                        td.style.color = colors.color;
+                    }
+                    
+                    tr.appendChild(td);
+                });
                 
                 // Add click handler to show overlay
                 tr.addEventListener('click', () => showSummaryOverlay(row));

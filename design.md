@@ -234,9 +234,23 @@ Groups data by 12-hour time windows showing glucose trends and intake informatio
 | **AM/PM** | Time window indicator |
 | **Date** | Calendar date |
 | **Dosage** | Amount of most recent insulin dose |
-| **Glucose Level before intake** | Glucose reading before first intake |
-| **Glucose level +1hr** through **+12hr** | Glucose readings at hourly intervals after first intake |
+| **Glucose Level before intake** | Glucose reading before first intake (with color coding) |
+| **Glucose level +1hr** through **+12hr** | Glucose readings at hourly intervals after first intake (with color coding) |
 | **kCal Intake** | Total kcal sum for the window |
+
+**Glucose Level Color Coding:**
+
+All glucose level cells in the timesheet are color-coded based on the following thresholds:
+
+| Glucose Range | Background Color | Font Color |
+|---------------|-----------------|------------|
+| ≥ 500 | Black (#000000) | White |
+| 400 - 499 | Red (#FF0000) | White |
+| 300 - 399 | Magenta (#FF00FF) | White |
+| 200 - 299 | Light Magenta (#FFB6FF or similar) | Black |
+| 101 - 199 | #98fab2 | Black |
+| 60 - 100 | #6eb882 | Black |
+| < 60 | Yellow (#FFFF00) | Red |
 
 **Details Shown in Overlay (Not in Main Table):**
 
