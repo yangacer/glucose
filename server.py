@@ -7,10 +7,18 @@ import sqlite3
 import urllib.parse
 from datetime import datetime, date, timedelta
 import os
+import ssl
 from collections import defaultdict
 
-PORT = 8000
-DB_PATH = 'glucose.db'
+PORT = int(os.environ.get('PORT', '8443'))  # Default HTTPS port for mTLS
+DB_PATH = os.environ.get('DB_PATH', 'glucose.db')
+
+# mTLS Configuration
+MTLS_ENABLED = os.environ.get('MTLS_ENABLED', 'true').lower() == 'true'
+CERTS_DIR = os.path.join(os.path.dirname(__file__), 'certs')
+CA_CERT_PATH = os.environ.get('CA_CERT', os.path.join(CERTS_DIR, 'ca', 'ca-cert.pem'))
+SERVER_CERT_PATH = os.environ.get('SERVER_CERT', os.path.join(CERTS_DIR, 'server', 'server-cert.pem'))
+SERVER_KEY_PATH = os.environ.get('SERVER_KEY', os.path.join(CERTS_DIR, 'server', 'server-key.pem'))
 
 
 # ============================================================================
@@ -342,6 +350,13 @@ class DataAccess:
 
 class GlucoseHandler(http.server.SimpleHTTPRequestHandler):
     
+    def list_directory(self, path):
+        """Redirect root directory to index.html."""
+        self.send_response(301)
+        self.send_header('Location', '/static/index.html')
+        self.end_headers()
+        return None
+    
     def _set_headers(self, status=200, content_type='application/json'):
         self.send_response(status)
         self.send_header('Content-type', content_type)
@@ -651,6 +666,80 @@ class GlucoseHandler(http.server.SimpleHTTPRequestHandler):
 # Server Initialization
 # ============================================================================
 
+def check_certificate_expiration(cert_path):
+    """Check if certificate is expiring soon and log warning."""
+    try:
+        import subprocess
+        result = subprocess.run(
+            ['openssl', 'x509', '-in', cert_path, '-noout', '-enddate'],
+            capture_output=True, text=True
+        )
+        if result.returncode == 0:
+            # Parse expiration date
+            date_str = result.stdout.strip().split('=')[1]
+            exp_date = datetime.strptime(date_str, '%b %d %H:%M:%S %Y %Z')
+            days_left = (exp_date - datetime.now()).days
+            
+            if days_left < 30:
+                print(f"WARNING: Certificate {cert_path} expires in {days_left} days!")
+            elif days_left < 0:
+                print(f"ERROR: Certificate {cert_path} has EXPIRED!")
+    except Exception as e:
+        print(f"Could not check certificate expiration: {e}")
+
+
+def create_ssl_context():
+    """Create and configure SSL context for mTLS."""
+    context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    
+    # Require client certificates
+    context.verify_mode = ssl.CERT_REQUIRED
+    
+    # Load CA certificate for client verification
+    context.load_verify_locations(cafile=CA_CERT_PATH)
+    
+    # Load server certificate and key
+    context.load_cert_chain(certfile=SERVER_CERT_PATH, keyfile=SERVER_KEY_PATH)
+    
+    # Set minimum TLS version to 1.2
+    context.minimum_version = ssl.TLSVersion.TLSv1_2
+    
+    # Configure cipher suites (prefer strong ciphers)
+    context.set_ciphers('HIGH:!aNULL:!MD5:!RC4')
+    
+    print(f"mTLS Configuration:")
+    print(f"  CA Certificate: {CA_CERT_PATH}")
+    print(f"  Server Certificate: {SERVER_CERT_PATH}")
+    print(f"  Server Key: {SERVER_KEY_PATH}")
+    
+    # Check certificate expiration
+    check_certificate_expiration(SERVER_CERT_PATH)
+    
+    return context
+
+
+def log_client_certificate(request, client_address):
+    """Log client certificate information."""
+    try:
+        cert = request.getpeercert()
+        if cert:
+            subject = dict(x[0] for x in cert['subject'])
+            cn = subject.get('commonName', 'Unknown')
+            print(f"Client connected: {cn} from {client_address[0]}")
+        else:
+            print(f"Client connected (no cert) from {client_address[0]}")
+    except Exception as e:
+        print(f"Could not retrieve client certificate: {e}")
+
+
+class SecureGlucoseHandler(GlucoseHandler):
+    """Extended handler that logs client certificate info."""
+    
+    def setup(self):
+        super().setup()
+        log_client_certificate(self.request, self.client_address)
+
+
 def main():
     if not os.path.exists(DB_PATH):
         print(f"Error: Database {DB_PATH} not found. Please run init_db.py first.")
@@ -658,9 +747,30 @@ def main():
     
     socketserver.TCPServer.allow_reuse_address = True
     
-    with socketserver.TCPServer(("", PORT), GlucoseHandler) as httpd:
+    if MTLS_ENABLED:
+        # Check if certificate files exist
+        if not all(os.path.exists(p) for p in [CA_CERT_PATH, SERVER_CERT_PATH, SERVER_KEY_PATH]):
+            print("ERROR: mTLS is enabled but certificate files not found!")
+            print("Please run ./generate-certs.sh to generate certificates.")
+            print("Or set MTLS_ENABLED=false to disable mTLS.")
+            return
+        
+        # Create HTTPS server with mTLS
+        with socketserver.TCPServer(("", PORT), SecureGlucoseHandler) as httpd:
+            ssl_context = create_ssl_context()
+            httpd.socket = ssl_context.wrap_socket(httpd.socket, server_side=True)
+            
+            print(f"✓ mTLS enabled - Server running at https://localhost:{PORT}/")
+            print(f"  Clients must present valid certificates signed by the CA")
+            print(f"  See CLIENT.md for client configuration instructions")
+            httpd.serve_forever()
+    else:
+        # Run without mTLS (development mode)
+        print("WARNING: mTLS is DISABLED - running in insecure mode!")
         print(f"Server running at http://localhost:{PORT}/")
-        httpd.serve_forever()
+        
+        with socketserver.TCPServer(("", PORT), GlucoseHandler) as httpd:
+            httpd.serve_forever()
 
 
 if __name__ == '__main__':

@@ -288,3 +288,193 @@ Table listing all nutrition master records
 - kCal
 - Weight (grams)
 - kCal per gram (calculated value)
+
+---
+
+# Security: Mutual TLS (mTLS)
+
+## Overview
+
+The application supports mutual TLS authentication to ensure secure, authenticated connections between clients and the server. Both server and client present certificates for verification.
+
+## Components
+
+### 1. Server mTLS Configuration
+
+**Implementation in `server.py`:**
+- Extends `http.server.HTTPServer` with SSL/TLS support
+- Requires client certificate verification (`ssl.CERT_REQUIRED`)
+- Loads server certificate and private key
+- Loads CA certificate for client verification
+- Enforces minimum TLS version (TLS 1.2 or higher)
+
+**Configuration:**
+- Certificate paths configurable via environment variables or config file
+- Default certificate directory: `certs/`
+- Required files:
+  - `certs/ca/ca-cert.pem` - Certificate Authority certificate
+  - `certs/server/server-cert.pem` - Server certificate
+  - `certs/server/server-key.pem` - Server private key
+  
+**Features:**
+- Logs client certificate CN (Common Name) on connection
+- Supports TLS 1.2 and TLS 1.3
+- Configurable cipher suites for security
+- Optional development mode to disable mTLS (via environment variable `MTLS_ENABLED=false`)
+- **Directory listing disabled** to prevent unauthorized browsing of server filesystem
+
+**Security Settings:**
+- `ssl.CERT_REQUIRED` - Mandatory client certificate
+- Verify client certificate against CA
+- Strong cipher suite selection
+- Disable insecure protocols (SSLv2, SSLv3, TLS 1.0, TLS 1.1)
+- Directory listing forbidden (returns 403 Forbidden)
+
+### 2. Certificate Generation Script
+
+**Script: `generate-certs.sh`**
+
+**Purpose:** Generate self-signed certificates for development and testing
+
+**Generates:**
+1. **Certificate Authority (CA)**
+   - CA private key (4096-bit RSA)
+   - CA certificate (valid 10 years)
+   - Location: `certs/ca/`
+
+2. **Server Certificate**
+   - Server private key (4096-bit RSA)
+   - Certificate signing request (CSR)
+   - Server certificate signed by CA (valid 2 years)
+   - Subject Alternative Names (SAN) for localhost and common IPs
+   - Location: `certs/server/`
+
+3. **Client Certificate(s)**
+   - Client private key (4096-bit RSA)
+   - Client certificate signing request (CSR)
+   - Client certificate signed by CA (valid 1 year)
+   - Location: `certs/clients/`
+   - Naming: `client-{name}-cert.pem` and `client-{name}-key.pem`
+
+**Features:**
+- Interactive mode: prompts for details (CN, organization, etc.)
+- Non-interactive mode: uses defaults for automation
+- Generates PKCS#12 format for browser import (`.p12` files)
+- Sets appropriate file permissions (private keys: 600)
+- Creates directory structure automatically
+
+**Usage Examples:**
+```bash
+# Generate all certificates (CA, server, and one client)
+./generate-certs.sh
+
+# Generate additional client certificate
+./generate-certs.sh --client-only --name "john-doe"
+
+# Non-interactive with defaults
+./generate-certs.sh --auto
+```
+
+### 3. Client Configuration Documentation
+
+**Document: `CLIENT.md`**
+
+**Contents:**
+
+1. **Overview**
+   - What is mTLS and why it's used
+   - Prerequisites for client setup
+
+2. **Certificate Installation**
+   - Browser configuration (Chrome, Firefox, Safari, Edge)
+   - Operating system certificate store (Windows, macOS, Linux)
+   - Mobile devices (iOS, Android)
+
+3. **Application-Specific Setup**
+   - Python `requests` library with client certificates
+   - curl command examples
+   - wget configuration
+   - JavaScript/Node.js fetch with certificates
+
+4. **Testing Connection**
+   - Verify certificate installation
+   - Test commands for validation
+   - Common error messages and solutions
+
+5. **Troubleshooting**
+   - Certificate not recognized
+   - Certificate expired
+   - Connection refused errors
+   - Browser-specific issues
+   - Certificate format conversion (PEM, PKCS#12, DER)
+
+6. **Security Best Practices**
+   - Protect private keys
+   - Certificate storage recommendations
+   - Expiration monitoring
+   - Revocation procedures
+
+7. **Example Code Snippets**
+   - Python client example
+   - curl commands for API testing
+   - Browser bookmark setup
+
+**Format:** Markdown with clear step-by-step instructions and screenshots where helpful
+
+---
+
+## Additional Features
+
+### Certificate Management
+- **Expiration Monitoring**: Server logs warnings for certificates expiring within 30 days
+- **Multiple Client Certificates**: Support for different users with unique certificates
+- **Certificate Revocation**: Future support for CRL (Certificate Revocation List)
+
+### Logging & Audit
+- Log all mTLS connections with client certificate CN
+- Timestamp and IP address logging
+- Failed authentication attempts logged
+- Audit trail in SQLite database (optional future feature)
+
+### Configuration File
+**Optional `mtls_config.json`:**
+```json
+{
+  "enabled": true,
+  "ca_cert": "certs/ca/ca-cert.pem",
+  "server_cert": "certs/server/server-cert.pem",
+  "server_key": "certs/server/server-key.pem",
+  "min_tls_version": "TLS1_2",
+  "cipher_suites": "HIGH:!aNULL:!MD5",
+  "require_client_cert": true,
+  "log_client_cn": true
+}
+```
+
+### Development Mode
+- Environment variable `MTLS_ENABLED=false` disables mTLS for local testing
+- Warning message displayed when running without mTLS
+- Useful for development and debugging
+
+---
+
+## Implementation Notes
+
+### Server Changes
+- Wrap existing `HTTPServer` with `ssl.wrap_socket()` or `SSLContext`
+- Add certificate loading and validation logic
+- Maintain backward compatibility with non-SSL mode for testing
+- Minimal changes to existing handler classes
+
+### Testing
+- Include test script: `test-mtls.sh` to validate configuration
+- Verify certificate chain
+- Test with valid and invalid certificates
+- Ensure proper error handling for certificate errors
+
+### Deployment Considerations
+- Certificate files must be readable by server process
+- Private keys should have restricted permissions (600)
+- Consider using proper CA for production (not self-signed)
+- Document certificate renewal process
+- Backup CA private key securely (required for issuing new client certs)

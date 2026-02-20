@@ -1,18 +1,178 @@
 # Glucose Monitoring System - Session Memo
 
-**Date:** 2026-02-07  
-**Latest Update:** Summary Timesheet Overlay Feature Implemented ✅
-**Session Status:** Overlay Feature Complete
+**Date:** 2026-02-09  
+**Latest Update:** Mutual TLS (mTLS) Security Feature Implemented ✅
+**Session Status:** mTLS Feature Complete
 
 ## Project Overview
 A web-based glucose monitoring dashboard built with:
 - **Backend:** Python 3.12 built-in http.server + SQLite3
 - **Frontend:** Vanilla HTML/CSS/JavaScript with Chart.js
-- **Port:** 8000
+- **Port:** 8443 (HTTPS with mTLS) or 8000 (HTTP development mode)
+- **Security:** Mutual TLS authentication (both server and client certificates)
 
-## Recent Changes (2026-02-07)
+## Recent Changes (2026-02-09)
 
-### Latest: Summary Timesheet Overlay Feature ✅
+### Latest: Mutual TLS (mTLS) Security Feature ✅
+
+**Completed:** Implemented mutual TLS authentication for secure client-server communication
+
+#### Changes:
+
+1. **Server Updates (server.py):**
+   - Added SSL/TLS support with `ssl` module
+   - Changed default port from 8000 to 8443 (HTTPS)
+   - Implemented `create_ssl_context()` function:
+     - Requires client certificates (`ssl.CERT_REQUIRED`)
+     - Loads CA certificate for client verification
+     - Loads server certificate and private key
+     - Enforces TLS 1.2+ minimum version
+     - Configures strong cipher suites
+   - Added `check_certificate_expiration()` function:
+     - Warns when certificates expire within 30 days
+     - Uses openssl command to check expiration dates
+   - Created `SecureGlucoseHandler` class:
+     - Extends existing `GlucoseHandler`
+     - Logs client certificate CN (Common Name) on connection
+   - Environment variable support:
+     - `MTLS_ENABLED=false` disables mTLS for development
+     - Certificate paths configurable via env vars
+   - Certificate path configuration:
+     - `CA_CERT`: `certs/ca/ca-cert.pem`
+     - `SERVER_CERT`: `certs/server/server-cert.pem`
+     - `SERVER_KEY`: `certs/server/server-key.pem`
+
+2. **Certificate Generation Script (generate-certs.sh):**
+   - Bash script to generate self-signed certificates
+   - Interactive and non-interactive modes (`--auto`)
+   - Generates three certificate types:
+     - **CA Certificate:** 4096-bit RSA, valid 10 years
+     - **Server Certificate:** 4096-bit RSA, valid 2 years, includes SANs for localhost
+     - **Client Certificate:** 4096-bit RSA, valid 1 year
+   - Client-only mode: `--client-only --name <client-name>`
+   - Generates PKCS#12 (.p12) bundles for browser import
+   - Sets secure file permissions (600 for private keys)
+   - Creates directory structure: `certs/{ca,server,clients}/`
+   - Features:
+     - Subject Alternative Names (SAN) for localhost, 127.0.0.1, ::1
+     - Certificate signing with proper extensions
+     - Automatic serial number management
+
+3. **Client Configuration Guide (CLIENT.md):**
+   - Comprehensive 9,600+ character documentation
+   - **Browser Setup Instructions:**
+     - Chrome/Chromium/Edge certificate import
+     - Firefox certificate and CA trust configuration
+     - Safari keychain setup for macOS
+   - **Command-Line Tools:**
+     - curl with client certificate examples
+     - wget configuration
+     - OpenSSL connection testing
+   - **Programming Languages:**
+     - Python (requests and urllib examples)
+     - JavaScript/Node.js HTTPS examples
+   - **Troubleshooting Section:**
+     - Certificate not recognized
+     - Certificate expired
+     - Connection refused errors
+     - Browser-specific issues
+     - Certificate format conversion (PEM, PKCS#12, DER)
+   - **Security Best Practices:**
+     - Private key protection
+     - Certificate storage recommendations
+     - Expiration monitoring
+     - Revocation procedures
+
+4. **Testing Script (test-mtls.sh):**
+   - Automated mTLS configuration validation
+   - Six test stages:
+     1. Check certificate files exist
+     2. Verify certificate chain with CA
+     3. Check certificate expiration dates
+     4. Verify server is running
+     5. Test connection WITH client cert (should succeed)
+     6. Test connection WITHOUT client cert (should fail)
+   - Color-coded output (green ✓, red ✗, yellow ⚠)
+   - Provides useful debugging commands
+   - Checks openssl availability
+
+5. **Additional Files:**
+   - **MTLS.md:** Quick start guide (1,400 characters)
+     - Certificate generation quick reference
+     - Server startup commands
+     - curl test examples
+     - Troubleshooting checklist
+   - **mtls_config.json.example:** Optional configuration template
+     - JSON format for SSL settings
+     - Cipher suite configuration
+     - TLS version settings
+   - **.gitignore:** Security-focused ignore rules
+     - Excludes all certificate files (*.pem, *.key, *.p12)
+     - Excludes certs/ directory
+     - Prevents accidental commit of secrets
+
+6. **Design Documentation (design.md):**
+   - Added comprehensive "Security: Mutual TLS (mTLS)" section
+   - Documented server mTLS configuration
+   - Certificate generation process
+   - Client configuration requirements
+   - Additional features:
+     - Certificate management
+     - Logging and audit trail
+     - Configuration file support
+     - Development mode
+   - Implementation notes and deployment considerations
+
+**Features:**
+- ✅ Full mTLS authentication (mutual certificate verification)
+- ✅ Self-signed certificate generation for development
+- ✅ Client certificate logging (CN tracking)
+- ✅ Certificate expiration monitoring
+- ✅ Multiple client certificate support
+- ✅ Development mode (mTLS can be disabled)
+- ✅ Strong cipher suite configuration
+- ✅ TLS 1.2+ enforcement
+- ✅ Comprehensive client setup documentation
+- ✅ Automated testing script
+- ✅ Security-focused .gitignore
+
+**Security Benefits:**
+- Prevents unauthorized access (clients need valid certificates)
+- Encrypts all communication end-to-end
+- Mutual authentication (both parties verified)
+- No passwords needed (certificate-based auth)
+- Audit trail of client connections
+- Protection against man-in-the-middle attacks
+
+**Usage:**
+```bash
+# Generate certificates
+./generate-certs.sh
+
+# Start server with mTLS (default)
+python3 server.py
+
+# Start server without mTLS (development)
+MTLS_ENABLED=false python3 server.py
+
+# Test configuration
+./test-mtls.sh
+
+# Access with curl
+curl https://localhost:8443/ \
+  --cert certs/clients/client-client-cert.pem \
+  --key certs/clients/client-client-key.pem \
+  --cacert certs/ca/ca-cert.pem
+
+# Generate additional client certificate
+./generate-certs.sh --client-only --name john-doe
+```
+
+**Testing:** Server syntax validated, all scripts executable, documentation complete ✅
+
+---
+
+### Previous: Summary Timesheet Overlay Feature ✅
 
 **Completed:** Implemented interactive overlay for summary timesheet detail view
 
@@ -310,15 +470,45 @@ Frontend (Pending):
 ## How to Run
 
 ### Start Server
+
+**With mTLS (Production):**
 ```bash
 cd /home/acer.yang/glucose
+# First time: Generate certificates
+./generate-certs.sh
+
+# Start server
 python3 server.py
-# Server starts on http://localhost:8000
+# Server starts on https://localhost:8443 with mTLS
+```
+
+**Without mTLS (Development):**
+```bash
+cd /home/acer.yang/glucose
+MTLS_ENABLED=false python3 server.py
+# Server starts on https://localhost:8443 without certificate verification
 ```
 
 ### Access Application
-- **Dashboard:** http://localhost:8000/static/index.html
-- **API Base:** http://localhost:8000/api/
+
+**With Browser:**
+1. Import client certificate (see CLIENT.md)
+2. Navigate to `https://localhost:8443/static/index.html`
+3. Select certificate when prompted
+
+**With curl:**
+```bash
+curl https://localhost:8443/ \
+  --cert certs/clients/client-client-cert.pem \
+  --key certs/clients/client-client-key.pem \
+  --cacert certs/ca/ca-cert.pem
+```
+
+### Test mTLS Configuration
+```bash
+./test-mtls.sh
+# Runs 6 validation tests and reports status
+```
 
 ### Initialize Fresh Database (Use Updated Schema)
 ```bash

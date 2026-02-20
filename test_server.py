@@ -33,14 +33,17 @@ class TestGlucoseAPI(unittest.TestCase):
     def setUpClass(cls):
         """Start the server before running tests"""
         cls.test_db = 'test_glucose.db'
+        cls.port = 8001  # Test server port
         cls.server_process = None
         
         # Create test database
         if os.path.exists(cls.test_db):
             os.remove(cls.test_db)
         
-        # Modify server to use test database
+        # Configure server to use test database and port
         os.environ['DB_PATH'] = cls.test_db
+        os.environ['PORT'] = str(cls.port)
+        os.environ['MTLS_ENABLED'] = 'false'  # Disable mTLS for tests
         
         # Initialize test database
         conn = sqlite3.connect(cls.test_db)
@@ -112,7 +115,6 @@ class TestGlucoseAPI(unittest.TestCase):
         conn.close()
         
         cls.host = 'localhost'
-        cls.port = 8001  # Use different port for testing
         cls.base_url = f'http://{cls.host}:{cls.port}'
     
     @classmethod
@@ -515,23 +517,17 @@ def run_tests_with_server():
     
     # Create test database
     test_db = 'test_glucose.db'
+    test_port = 8001
+    
     if os.path.exists(test_db):
         os.remove(test_db)
     
     # Start server on test port with test database
-    print("Starting test server on port 8001...")
+    print(f"Starting test server on port {test_port}...")
     server_env = os.environ.copy()
     server_env['DB_PATH'] = test_db
-    
-    # Modify server.py temporarily to use test database
-    with open('server.py', 'r') as f:
-        server_code = f.read()
-    
-    server_code = server_code.replace("DB_PATH = 'glucose.db'", f"DB_PATH = '{test_db}'")
-    server_code = server_code.replace("PORT = 8000", "PORT = 8001")
-    
-    with open('test_server_temp.py', 'w') as f:
-        f.write(server_code)
+    server_env['PORT'] = str(test_port)
+    server_env['MTLS_ENABLED'] = 'false'
     
     # Initialize test database using init_db logic
     conn = sqlite3.connect(test_db)
@@ -611,7 +607,8 @@ def run_tests_with_server():
     
     # Start server
     server_process = subprocess.Popen(
-        ['python3', 'test_server_temp.py'],
+        ['python3', 'server.py'],
+        env=server_env,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE
     )
@@ -634,8 +631,6 @@ def run_tests_with_server():
         server_process.terminate()
         server_process.wait()
         
-        if os.path.exists('test_server_temp.py'):
-            os.remove('test_server_temp.py')
         if os.path.exists(test_db):
             os.remove(test_db)
 

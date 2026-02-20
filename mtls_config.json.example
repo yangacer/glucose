@@ -1,0 +1,10 @@
+{
+  "enabled": true,
+  "ca_cert": "certs/ca/ca-cert.pem",
+  "server_cert": "certs/server/server-cert.pem",
+  "server_key": "certs/server/server-key.pem",
+  "min_tls_version": "TLS1_2",
+  "cipher_suites": "HIGH:!aNULL:!MD5",
+  "require_client_cert": true,
+  "log_client_cn": true
+}
