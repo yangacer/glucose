@@ -1,5 +1,5 @@
 // API Configuration
-const API_BASE = 'http://localhost:8000/api';
+const API_BASE = '/api';
 
 // Export for module usage
 if (typeof module !== 'undefined' && module.exports) {
