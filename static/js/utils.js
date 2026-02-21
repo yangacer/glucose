@@ -95,3 +95,15 @@ function setCurrentTimestamp() {
         }
     });
 }
+
+/**
+ * Reset timestamp input to current time
+ * @param {string} inputId - ID of the datetime-local input element
+ */
+function resetToNow(inputId) {
+    const input = document.getElementById(inputId);
+    if (input) {
+        const timestamp = getCurrentTimestamp();
+        input.value = timestamp;
+    }
+}

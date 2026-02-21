@@ -113,6 +113,7 @@ All forms include timestamp autofill functionality and audit/edit listings showi
 ### 1. Glucose Input Form
 **Fields:**
 - Timestamp (datetime-local input, autofilled with current time)
+  - **Reset to Now button**: Positioned next to timestamp input, resets timestamp to current time when clicked
 - Glucose Level (number input)
 
 **Audit & Edit:** Shows last 24 hours of glucose records with date range filter
@@ -122,6 +123,7 @@ All forms include timestamp autofill functionality and audit/edit listings showi
 ### 2. Insulin Input Form
 **Fields:**
 - Timestamp (datetime-local input, autofilled with current time)
+  - **Reset to Now button**: Positioned next to timestamp input, resets timestamp to current time when clicked
 - Insulin Level (number input)
 
 **Audit & Edit:** Shows last 24 hours of insulin records with date range filter
@@ -133,6 +135,7 @@ This form supports multiple nutrition and supplement items sharing the same time
 
 **Fields:**
 - **Timestamp** (datetime-local input, autofilled with current time) - shared by all items
+  - **Reset to Now button**: Positioned next to timestamp input, resets timestamp to current time when clicked
 
 **Nutrition Items Section:**
 - Dynamic list with Add/Remove buttons (minimum 1 item)
@@ -177,6 +180,7 @@ This form supports multiple nutrition and supplement items sharing the same time
 ### 5. Event Input Form
 **Fields:**
 - Timestamp (datetime-local input, autofilled with current time)
+  - **Reset to Now button**: Positioned next to timestamp input, resets timestamp to current time when clicked
 - Event Name (text input)
 - Event Notes (textarea input)
 
