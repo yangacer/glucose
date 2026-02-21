@@ -111,7 +111,7 @@ async function loadSupplementsList() {
             return;
         }
         
-        let html = '<table><thead><tr><th>ID</th><th>Supplement Name</th><th>Default Amount</th><th>Actions</th></tr></thead><tbody>';
+        let html = '<div class="table-wrapper"><table class="audit-table"><thead><tr><th>ID</th><th>Supplement Name</th><th>Default Amount</th><th>Actions</th></tr></thead><tbody>';
         
         data.forEach(item => {
             html += `
@@ -131,7 +131,7 @@ async function loadSupplementsList() {
             `;
         });
         
-        html += '</tbody></table>';
+        html += '</tbody></table></div>';
         container.innerHTML = html;
         
         // Add event listeners

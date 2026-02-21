@@ -370,3 +370,231 @@ section h2 {
 #summaryTable tbody tr:hover {
     background-color: #f8f9fa;
 }
+
+/* ===== Responsive Design (Mobile) ===== */
+
+/* Tablets and below (768px) */
+@media (max-width: 768px) {
+    body {
+        padding: 10px;
+    }
+    
+    .container {
+        border-radius: 5px;
+        margin: 0;
+    }
+    
+    header h1 {
+        font-size: 1.5em;
+    }
+    
+    header {
+        padding: 20px 15px;
+    }
+    
+    .tab-btn {
+        font-size: 0.9em;
+        padding: 12px 15px;
+        min-width: 100px;
+    }
+    
+    .tab-content {
+        padding: 20px 15px;
+    }
+    
+    form {
+        max-width: 100%;
+        padding: 0 5px;
+    }
+    
+    form label {
+        margin-bottom: 15px;
+    }
+    
+    .nutrition-item {
+        padding: 15px;
+        margin-bottom: 12px;
+    }
+    
+    .message {
+        padding: 8px;
+        margin-top: 15px;
+    }
+    
+    /* Increase touch target sizes for mobile */
+    .edit-btn, .delete-btn, .save-btn, .cancel-btn {
+        padding: 8px 12px;
+        font-size: 0.9em;
+        min-width: 44px;
+        min-height: 44px;
+        margin: 2px;
+    }
+    
+    button[type="submit"] {
+        min-height: 44px;
+        padding: 12px;
+    }
+    
+    /* Improve table readability on mobile */
+    table {
+        font-size: 0.9em;
+    }
+    
+    table th, table td {
+        padding: 8px 6px;
+    }
+    
+    /* Ensure action columns are visible */
+    .audit-table th:last-child,
+    .audit-table td:last-child {
+        position: sticky;
+        right: 0;
+        background: white;
+        box-shadow: -2px 0 4px rgba(0,0,0,0.1);
+    }
+    
+    .audit-table th:last-child {
+        background: #667eea;
+        z-index: 2;
+    }
+    
+    .audit-table tbody tr:hover td:last-child {
+        background: #f8f9fa;
+    }
+    
+    /* Chart adjustments */
+    #glucoseChart {
+        max-height: 300px;
+    }
+    
+    /* Filter adjustments */
+    .date-filter, .audit-filters {
+        flex-wrap: wrap;
+        gap: 10px;
+        padding: 0;
+    }
+    
+    .date-filter label,
+    .audit-filters label {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 4px;
+        padding: 0;
+    }
+}
+
+/* Small phones (480px and below) */
+@media (max-width: 480px) {
+    body {
+        padding: 5px;
+    }
+    
+    .container {
+        border-radius: 0;
+        box-shadow: none;
+    }
+    
+    header {
+        padding: 15px 10px;
+    }
+    
+    header h1 {
+        font-size: 1.3em;
+    }
+    
+    .tab-content {
+        padding: 15px 8px;
+    }
+    
+    .tab-btn {
+        font-size: 0.85em;
+        padding: 10px 8px;
+        min-width: 80px;
+    }
+    
+    form {
+        padding: 0;
+    }
+    
+    form label {
+        margin-bottom: 12px;
+    }
+    
+    .nutrition-item {
+        padding: 12px;
+        margin-bottom: 10px;
+        border-radius: 5px;
+    }
+    
+    .nutrition-item h3 {
+        font-size: 0.95em;
+        margin-bottom: 10px;
+    }
+    
+    .message {
+        padding: 8px;
+        margin-top: 12px;
+        font-size: 0.9em;
+    }
+    
+    form input, form select, form textarea {
+        padding: 8px;
+        font-size: 16px;
+    }
+    
+    table {
+        font-size: 0.85em;
+    }
+    
+    table th, table td {
+        padding: 6px 3px;
+    }
+    
+    /* Stack filter elements vertically */
+    .date-filter, .audit-filters {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .audit-filters label {
+        width: 100%;
+    }
+    
+    .audit-filters input,
+    .audit-filters button {
+        width: 100%;
+    }
+    
+    /* Adjust detail overlay for small screens */
+    .detail-overlay .detail-content {
+        width: 95%;
+        max-height: 85vh;
+        padding: 12px;
+    }
+    
+    .detail-overlay h3 {
+        font-size: 1.1em;
+        margin-bottom: 12px;
+    }
+    
+    .detail-row {
+        flex-direction: column;
+        gap: 5px;
+        padding: 6px 0;
+    }
+    
+    .detail-label {
+        min-width: auto;
+        font-weight: 600;
+    }
+    
+    .detail-value {
+        word-break: break-word;
+    }
+    
+    /* Adjust button sizing */
+    .edit-btn, .delete-btn, .save-btn, .cancel-btn {
+        font-size: 0.85em;
+        padding: 6px 10px;
+    }
+}

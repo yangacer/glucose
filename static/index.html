@@ -101,18 +101,20 @@
             
             <section class="nutrition-list-section">
                 <h2>Nutrition List</h2>
-                <table id="nutritionListTable">
-                    <thead>
-                        <tr>
-                            <th>ID</th>
-                            <th>Nutrition Name</th>
-                            <th>kCal</th>
-                            <th>Weight (g)</th>
-                            <th>kCal per gram</th>
-                        </tr>
-                    </thead>
-                    <tbody id="nutritionListBody"></tbody>
-                </table>
+                <div class="table-wrapper">
+                    <table id="nutritionListTable">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Nutrition Name</th>
+                                <th>kCal</th>
+                                <th>Weight (g)</th>
+                                <th>kCal per gram</th>
+                            </tr>
+                        </thead>
+                        <tbody id="nutritionListBody"></tbody>
+                    </table>
+                </div>
             </section>
         </div>
         
@@ -132,17 +134,19 @@
                 <label>End Date: <input type="date" id="glucose-end-filter"></label>
                 <button onclick="loadGlucoseAudit()">Filter</button>
             </div>
-            <table class="audit-table">
-                <thead>
-                    <tr>
-                        <th>ID</th>
-                        <th>Timestamp</th>
-                        <th>Level (mg/dL)</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody id="glucose-audit-body"></tbody>
-            </table>
+            <div class="table-wrapper">
+                <table class="audit-table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Timestamp</th>
+                            <th>Level (mg/dL)</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="glucose-audit-body"></tbody>
+                </table>
+            </div>
         </div>
         
         <!-- Insulin Input Tab -->
@@ -161,17 +165,19 @@
                 <label>End Date: <input type="date" id="insulin-end-filter"></label>
                 <button onclick="loadInsulinAudit()">Filter</button>
             </div>
-            <table class="audit-table">
-                <thead>
-                    <tr>
-                        <th>ID</th>
-                        <th>Timestamp</th>
-                        <th>Level</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody id="insulin-audit-body"></tbody>
-            </table>
+            <div class="table-wrapper">
+                <table class="audit-table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Timestamp</th>
+                            <th>Level</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="insulin-audit-body"></tbody>
+                </table>
+            </div>
         </div>
         
         <!-- Intake Input Tab -->
@@ -220,19 +226,21 @@
                 <label>End Date: <input type="date" id="intake-end-filter"></label>
                 <button onclick="loadIntakeAudit()">Filter</button>
             </div>
-            <table class="audit-table">
-                <thead>
-                    <tr>
-                        <th>ID</th>
-                        <th>Timestamp</th>
-                        <th>Nutrition</th>
-                        <th>Amount (g)</th>
-                        <th>kCal</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody id="intake-audit-body"></tbody>
-            </table>
+            <div class="table-wrapper">
+                <table class="audit-table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Timestamp</th>
+                            <th>Nutrition</th>
+                            <th>Amount (g)</th>
+                            <th>kCal</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="intake-audit-body"></tbody>
+                </table>
+            </div>
             
             <h3>Supplements - Recent Entries (Last 24 Hours)</h3>
             <div class="audit-filters">
@@ -240,18 +248,20 @@
                 <label>End Date: <input type="date" id="supplement-intake-end-filter"></label>
                 <button onclick="loadSupplementIntakeAudit()">Filter</button>
             </div>
-            <table class="audit-table">
-                <thead>
-                    <tr>
-                        <th>ID</th>
-                        <th>Timestamp</th>
-                        <th>Supplement</th>
-                        <th>Amount</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody id="supplement-intake-audit-body"></tbody>
-            </table>
+            <div class="table-wrapper">
+                <table class="audit-table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Timestamp</th>
+                            <th>Supplement</th>
+                            <th>Amount</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="supplement-intake-audit-body"></tbody>
+                </table>
+            </div>
         </div>
         
         <!-- Supplements Input Tab -->
@@ -285,18 +295,20 @@
                 <label>End Date: <input type="date" id="event-end-filter"></label>
                 <button onclick="loadEventAudit()">Filter</button>
             </div>
-            <table class="audit-table">
-                <thead>
-                    <tr>
-                        <th>ID</th>
-                        <th>Timestamp</th>
-                        <th>Event Name</th>
-                        <th>Event Notes</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody id="event-audit-body"></tbody>
-            </table>
+            <div class="table-wrapper">
+                <table class="audit-table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Timestamp</th>
+                            <th>Event Name</th>
+                            <th>Event Notes</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="event-audit-body"></tbody>
+                </table>
+            </div>
         </div>
         
         <!-- Nutrition Input Tab -->
@@ -311,19 +323,21 @@
             <div id="nutrition-message" class="message"></div>
             
             <h3>Recent Entries</h3>
-            <table class="audit-table">
-                <thead>
-                    <tr>
-                        <th>ID</th>
-                        <th>Nutrition Name</th>
-                        <th>kCal</th>
-                        <th>Weight (g)</th>
-                        <th>kCal per gram</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody id="nutrition-audit-body"></tbody>
-            </table>
+            <div class="table-wrapper">
+                <table class="audit-table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Nutrition Name</th>
+                            <th>kCal</th>
+                            <th>Weight (g)</th>
+                            <th>kCal per gram</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="nutrition-audit-body"></tbody>
+                </table>
+            </div>
         </div>
     </div>
     
