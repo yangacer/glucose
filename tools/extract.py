@@ -8,6 +8,7 @@
 # glucose maps to 血糖值 or 餐前血糖值, depending on which one is available
 
 import sys
+import re
 
 header = sys.stdin.readline().strip()
 fields = header.split(",")
@@ -29,3 +30,40 @@ elif sys.argv[1] == 'insulin':
     insulin_dose = fields[3].strip()
     if insulin_dose:
       print(f"{timestamp},{insulin_dose}")
+elif sys.argv[1] == 'intake':
+  food_info = {
+    'Va': {
+      'id':1,
+      'energy': 1.16588235294118,
+    },
+    '好味': {
+      'id': 2,
+      'energy': 1.14814814814815,
+    }
+  }
+  last_intakes = []
+  for line in sys.stdin:
+    fields = line.strip().split(",")
+    timestamp = fields[0].strip()
+    intakes = fields[5].strip().split('+')
+    # for each intake, it is consist of food name, amount, and unit(g). e.g.
+    # `milk200g`. The food name is UTF-8 string, and the amount is a number.
+    # The unit is always 'g'.
+    regex = r'([^\d]+)(\d+)(g)'
+    if intakes:
+      if intakes[0] == '同上':
+        for intake in last_intakes:
+          food_name, amount = intake
+          info = food_info[food_name]
+          print(f"{info['id']},{timestamp},{float(amount)},{float(amount) * info['energy']}")
+      elif intakes[0]:
+        last_intakes = []
+        for intake in intakes:
+          match = re.match(regex, intake)
+          if match:
+            food_name = match.group(1)
+            amount = match.group(2)
+            last_intakes.append((food_name, amount))
+            info = food_info[food_name]
+            print(f"{info['id']},{timestamp},{float(amount)},{float(amount) * info['energy']}")
+
