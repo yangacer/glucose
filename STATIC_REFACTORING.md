@@ -8,21 +8,21 @@ Refactored the monolithic `app.js` (1159 lines) into modular JavaScript files or
 ### Directory Structure
 ```
 static/
-├── index.html              (updated references)
-├── README.md               (new documentation)
-├── app.js.backup          (backup of original)
-├── css/
-│   └── styles.css         (moved from root)
-└── js/
-    ├── config.js          (187 bytes)
-    ├── utils.js           (3114 bytes)
-    ├── tabs.js            (1791 bytes)
-    ├── dashboard.js       (4522 bytes)
-    ├── data-loader.js     (11406 bytes)
-    ├── dynamic-items.js   (4180 bytes)
-    ├── forms.js           (7187 bytes)
-    ├── audit.js           (12457 bytes)
-    └── main.js            (387 bytes)
+ index.html              (updated references)
+ README.md               (new documentation)
+ app.js.backup          (backup of original)
+ css/
+    styles.css         (moved from root)
+ js/
+     config.js          (187 bytes)
+     utils.js           (3114 bytes)
+     tabs.js            (1791 bytes)
+     dashboard.js       (4522 bytes)
+     data-loader.js     (11406 bytes)
+     dynamic-items.js   (4180 bytes)
+     forms.js           (7187 bytes)
+     audit.js           (12457 bytes)
+     main.js            (387 bytes)
 ```
 
 ### Module Organization
@@ -104,14 +104,14 @@ static/
 ### Load Order
 Files must load in specific order due to dependencies:
 1. config.js (no dependencies)
-2. utils.js → config.js
-3. tabs.js → utils.js
-4. dashboard.js → config.js, utils.js
-5. data-loader.js → config.js, dynamic-items.js
-6. dynamic-items.js → data-loader.js
-7. forms.js → utils.js, data-loader.js
-8. audit.js → config.js, utils.js, data-loader.js
-9. main.js → all modules
+2. utils.js  config.js
+3. tabs.js  utils.js
+4. dashboard.js  config.js, utils.js
+5. data-loader.js  config.js, dynamic-items.js
+6. dynamic-items.js  data-loader.js
+7. forms.js  utils.js, data-loader.js
+8. audit.js  config.js, utils.js, data-loader.js
+9. main.js  all modules
 
 ### Testing
 - Validation script created: `validate-static.sh`

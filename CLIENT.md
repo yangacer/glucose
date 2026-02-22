@@ -25,7 +25,7 @@ Mutual TLS (mTLS) is a security protocol where both the client and server authen
 
 **Import Certificate:**
 
-1. Open Settings → Privacy and security → Security → Manage certificates
+1. Open Settings  Privacy and security  Security  Manage certificates
 2. Navigate to "Your certificates" tab
 3. Click "Import"
 4. Select your `client-<name>.p12` file
@@ -49,7 +49,7 @@ google-chrome \
 
 **Import Certificate:**
 
-1. Open Settings → Privacy & Security → Certificates → View Certificates
+1. Open Settings  Privacy & Security  Certificates  View Certificates
 2. Click "Your Certificates" tab
 3. Click "Import"
 4. Select your `client-<name>.p12` file
@@ -112,7 +112,7 @@ google-chrome \
    - Tap "Done"
 
 3. **Trust the Certificate:**
-   - Go to Settings → General → About → Certificate Trust Settings
+   - Go to Settings  General  About  Certificate Trust Settings
    - Enable full trust for your client certificate
    - Tap "Continue" to confirm
 
@@ -123,14 +123,14 @@ google-chrome \
    - Tap the file to download
 
 2. **Install CA Profile:**
-   - Go to Settings → Profile Downloaded or Settings → General → VPN & Device Management
+   - Go to Settings  Profile Downloaded or Settings  General  VPN & Device Management
    - Tap the CA certificate profile
    - Tap "Install" (enter passcode if prompted)
    - Tap "Install" again to confirm
    - Tap "Done"
 
 3. **Trust the CA:**
-   - Go to Settings → General → About → Certificate Trust Settings
+   - Go to Settings  General  About  Certificate Trust Settings
    - Enable full trust for the CA certificate (scroll down to find it)
    - Tap "Continue" when warned
 
@@ -143,9 +143,9 @@ google-chrome \
 
 **Troubleshooting iOS:**
 - If certificate isn't trusted: Verify it's enabled in Certificate Trust Settings
-- If Safari doesn't prompt: Try clearing Safari cache (Settings → Safari → Clear History)
+- If Safari doesn't prompt: Try clearing Safari cache (Settings  Safari  Clear History)
 - Connection fails: Ensure your device is on the same network as the server
-- Certificate not found: Verify profile is installed in Settings → General → VPN & Device Management
+- Certificate not found: Verify profile is installed in Settings  General  VPN & Device Management
 
 ---
 
@@ -162,10 +162,10 @@ google-chrome \
    - Save them to your device's Downloads folder
 
 2. **Install Client Certificate (.p12):**
-   - Go to Settings → Security → Encryption & credentials
-   - (On some devices: Settings → Biometrics and security → Other security settings)
-   - Tap "Install a certificate" → "VPN & app user certificate"
-   - Tap the menu icon (☰) → Show internal storage
+   - Go to Settings  Security  Encryption & credentials
+   - (On some devices: Settings  Biometrics and security  Other security settings)
+   - Tap "Install a certificate"  "VPN & app user certificate"
+   - Tap the menu icon ()  Show internal storage
    - Navigate to Downloads folder
    - Tap your `client-<name>.p12` file
    - Enter the password (if set)
@@ -173,8 +173,8 @@ google-chrome \
    - Tap "OK"
 
 3. **Install CA Certificate:**
-   - Go to Settings → Security → Encryption & credentials
-   - Tap "Install a certificate" → "CA certificate"
+   - Go to Settings  Security  Encryption & credentials
+   - Tap "Install a certificate"  "CA certificate"
    - Tap "Install anyway" when warned
    - Navigate to your `ca-cert.pem` file
    - Tap to install
@@ -205,22 +205,22 @@ google-chrome \
 4. Select certificate when requested
 
 **Verify Certificate Installation:**
-1. Go to Settings → Security → Encryption & credentials
+1. Go to Settings  Security  Encryption & credentials
 2. Tap "User credentials" to see client certificate
-3. Tap "Trusted credentials" → "User" tab to see CA certificate
+3. Tap "Trusted credentials"  "User" tab to see CA certificate
 
 **Troubleshooting Android:**
-- Certificate not found: Check Settings → Security → User credentials
+- Certificate not found: Check Settings  Security  User credentials
 - Connection refused: Verify server IP and port are correct
 - Certificate expired: Check certificate validity period
-- Chrome doesn't prompt: Clear Chrome data (Settings → Apps → Chrome → Storage → Clear data)
+- Chrome doesn't prompt: Clear Chrome data (Settings  Apps  Chrome  Storage  Clear data)
 - Security warning: Ensure CA certificate is installed under "Trusted credentials"
 
 **Android Version-Specific Notes:**
 - **Android 11+**: May require installing via Settings only (direct file tap may not work)
 - **Android 12+**: Enhanced security may show additional warnings
-- **Samsung devices**: Path may be Settings → Biometrics and security → Other security settings
-- **OnePlus/Oppo**: May be under Settings → Password & security → Credentials
+- **Samsung devices**: Path may be Settings  Biometrics and security  Other security settings
+- **OnePlus/Oppo**: May be under Settings  Password & security  Credentials
 
 ---
 
@@ -443,10 +443,10 @@ curl -v https://localhost:8443/ \
 **Error:** `Connection refused` or `Failed to connect`
 
 **Possible causes:**
-1. Server is not running → Start with `python3 server.py`
-2. Wrong port → Verify server is listening on port 8443
-3. Firewall blocking connection → Check firewall rules
-4. mTLS disabled → Check `MTLS_ENABLED` environment variable
+1. Server is not running  Start with `python3 server.py`
+2. Wrong port  Verify server is listening on port 8443
+3. Firewall blocking connection  Check firewall rules
+4. mTLS disabled  Check `MTLS_ENABLED` environment variable
 
 ### Wrong Certificate Selected (Browser)
 

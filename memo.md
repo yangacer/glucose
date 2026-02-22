@@ -1,7 +1,7 @@
 # Glucose Monitoring System - Session Memo
 
 **Date:** 2026-02-09  
-**Latest Update:** Mutual TLS (mTLS) Security Feature Implemented ✅
+**Latest Update:** Mutual TLS (mTLS) Security Feature Implemented 
 **Session Status:** mTLS Feature Complete
 
 ## Project Overview
@@ -13,7 +13,7 @@ A web-based glucose monitoring dashboard built with:
 
 ## Recent Changes (2026-02-09)
 
-### Latest: Mutual TLS (mTLS) Security Feature ✅
+### Latest: Mutual TLS (mTLS) Security Feature 
 
 **Completed:** Implemented mutual TLS authentication for secure client-server communication
 
@@ -92,7 +92,7 @@ A web-based glucose monitoring dashboard built with:
      4. Verify server is running
      5. Test connection WITH client cert (should succeed)
      6. Test connection WITHOUT client cert (should fail)
-   - Color-coded output (green ✓, red ✗, yellow ⚠)
+   - Color-coded output (green , red , yellow )
    - Provides useful debugging commands
    - Checks openssl availability
 
@@ -124,17 +124,17 @@ A web-based glucose monitoring dashboard built with:
    - Implementation notes and deployment considerations
 
 **Features:**
-- ✅ Full mTLS authentication (mutual certificate verification)
-- ✅ Self-signed certificate generation for development
-- ✅ Client certificate logging (CN tracking)
-- ✅ Certificate expiration monitoring
-- ✅ Multiple client certificate support
-- ✅ Development mode (mTLS can be disabled)
-- ✅ Strong cipher suite configuration
-- ✅ TLS 1.2+ enforcement
-- ✅ Comprehensive client setup documentation
-- ✅ Automated testing script
-- ✅ Security-focused .gitignore
+-  Full mTLS authentication (mutual certificate verification)
+-  Self-signed certificate generation for development
+-  Client certificate logging (CN tracking)
+-  Certificate expiration monitoring
+-  Multiple client certificate support
+-  Development mode (mTLS can be disabled)
+-  Strong cipher suite configuration
+-  TLS 1.2+ enforcement
+-  Comprehensive client setup documentation
+-  Automated testing script
+-  Security-focused .gitignore
 
 **Security Benefits:**
 - Prevents unauthorized access (clients need valid certificates)
@@ -168,11 +168,11 @@ curl https://localhost:8443/ \
 ./generate-certs.sh --client-only --name john-doe
 ```
 
-**Testing:** Server syntax validated, all scripts executable, documentation complete ✅
+**Testing:** Server syntax validated, all scripts executable, documentation complete 
 
 ---
 
-### Previous: Summary Timesheet Overlay Feature ✅
+### Previous: Summary Timesheet Overlay Feature 
 
 **Completed:** Implemented interactive overlay for summary timesheet detail view
 
@@ -204,9 +204,9 @@ curl https://localhost:8443/ \
    - Added click-outside-to-dismiss handler
 
 **Behavior:**
-- Click any timesheet row → overlay displays with detail information
+- Click any timesheet row  overlay displays with detail information
 - Overlay shows: Dose Time (HH:MM), Intake Time (HH:MM), Nutritions, Supplements, Events
-- Click anywhere outside overlay content → overlay closes
+- Click anywhere outside overlay content  overlay closes
 - Only one row can be selected at a time
 
 **Benefits:**
@@ -216,11 +216,11 @@ curl https://localhost:8443/ \
 - Better use of screen space
 - Improved user experience
 
-**Testing:** Server running, all files served correctly ✅
+**Testing:** Server running, all files served correctly 
 
 ---
 
-### Static Files Refactoring ✅
+### Static Files Refactoring 
 
 **Completed:** Refactored monolithic frontend code into modular architecture
 
@@ -256,11 +256,11 @@ curl https://localhost:8443/ \
 - Supports team collaboration
 - Scalable architecture
 
-**Testing:** All structure validated with validation script ✅
+**Testing:** All structure validated with validation script 
 
 ---
 
-### Server Refactoring ✅
+### Server Refactoring 
 
 ### Major Refactoring Completed
 The `server.py` file has been refactored from a monolithic 807-line file into a well-organized, maintainable codebase with clear separation of concerns:
@@ -305,7 +305,7 @@ The `server.py` file has been refactored from a monolithic 807-line file into a 
 
 ## Previous Changes (2026-02-06) - Supplements Feature
 
-### Database Schema Changes ✅
+### Database Schema Changes 
 **Dropped old supplements table** (had: id, timestamp, supplement_name, supplement_amount)
 
 **Created new structure:**
@@ -315,7 +315,7 @@ The `server.py` file has been refactored from a monolithic 807-line file into a 
   - Purpose: Record actual supplement intake transactions
 - Added indexes: `idx_supplement_intake_timestamp`, `idx_supplement_intake_supplement_id`
 
-### Backend API Updates ✅
+### Backend API Updates 
 
 #### New Supplements Master Endpoints:
 - `GET /api/supplements` - List all predefined supplements
@@ -340,7 +340,7 @@ The `server.py` file has been refactored from a monolithic 807-line file into a 
 - **`GET /api/dashboard/summary`** - Now queries supplement_intake with JOIN to supplements
   - Displays grouped supplements: "Supplement Name Amount, ..."
 
-### Code Cleanup ✅
+### Code Cleanup 
 - Removed duplicate handler methods with wrong indentation
 - Fixed all indentation issues
 - Verified syntax with `python3 -m py_compile`
@@ -351,7 +351,7 @@ The `server.py` file has been refactored from a monolithic 807-line file into a 
 ### 1. Supplements Master Form (New Page/Section Needed)
 Create a form similar to Nutrition Master form:
 - Input fields: supplement_name, default_amount (number, default=1)
-- Submit button → POST to `/api/supplements`
+- Submit button  POST to `/api/supplements`
 - Listing section below form:
   - Show all supplements from GET `/api/supplements`
   - Edit/Delete buttons for each row
@@ -391,7 +391,7 @@ Add **second listing section** after the existing nutrition intake listing:
 
 ## Testing Checklist
 
-Backend (All ✅):
+Backend (All ):
 - [x] Database schema created
 - [x] All API endpoints working
 - [x] Auto-fill API returns both nutrition and supplements
@@ -407,7 +407,7 @@ Frontend (Pending):
 - [ ] Supplement intake audit/edit listing works
 - [ ] Summary dashboard displays grouped supplements
 
-## Completed Features ✅
+## Completed Features 
 
 ### 1. Database Schema
 - 7 tables: glucose, insulin, intake, **supplements (master)**, **supplement_intake**, event, nutrition
@@ -421,7 +421,7 @@ Frontend (Pending):
   - `/api/dashboard/glucose-chart` - Time-weighted mean by week
   - `/api/dashboard/summary` - 12-hour window summary timesheet with grouped supplements
 - **PUT endpoints:** UPDATE for all tables
-- **DELETE endpoints:** DELETE for all tables ✅ Working
+- **DELETE endpoints:** DELETE for all tables  Working
 
 ### 3. Frontend Features (Partial - Supplements Not Yet Implemented in UI)
 - **6 Input Forms:** Glucose, Insulin, Intake (dynamic multi-item), ~~Supplements~~, Event, Nutrition
@@ -438,8 +438,8 @@ Frontend (Pending):
 ### 4. Time Windows Logic
 - Fixed 12-hour windows: 00:00-12:00 (AM) and 12:00-24:00 (PM)
 - Previous window calculation:
-  - If current time < 12:00 → previous = yesterday PM
-  - If current time >= 12:00 → previous = today AM
+  - If current time < 12:00  previous = yesterday PM
+  - If current time >= 12:00  previous = today AM
 - Summary groups by non-overlapping windows
 - Insulin dose: most recent in window
 - First intake time displayed
@@ -454,17 +454,17 @@ Frontend (Pending):
 ## File Structure
 ```
 /home/acer.yang/glucose/
-├── init_db.py              # Database initialization (needs update for new schema)
-├── server.py               # HTTP server + API (~800 lines)
-├── test_server.py          # Unit tests (may need updates)
-├── design.md               # Design specification (aligned with implementation)
-├── glucose.db              # SQLite database (schema updated)
-├── static/
-│   ├── index.html          # Frontend UI (NEEDS UPDATE for supplements)
-│   ├── styles.css          # Styling
-│   └── app.js              # Frontend logic (NEEDS UPDATE for supplements)
-├── time-weighted-mean.py   # Reference implementation
-└── [CSV files]             # Legacy data files
+ init_db.py              # Database initialization (needs update for new schema)
+ server.py               # HTTP server + API (~800 lines)
+ test_server.py          # Unit tests (may need updates)
+ design.md               # Design specification (aligned with implementation)
+ glucose.db              # SQLite database (schema updated)
+ static/
+    index.html          # Frontend UI (NEEDS UPDATE for supplements)
+    styles.css          # Styling
+    app.js              # Frontend logic (NEEDS UPDATE for supplements)
+ time-weighted-mean.py   # Reference implementation
+ [CSV files]             # Legacy data files
 ```
 
 ## How to Run

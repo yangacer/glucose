@@ -53,12 +53,21 @@ def init_database():
     )
     ''')
     
-    # Create supplements table
+    # Create supplements table (master)
     cursor.execute('''
     CREATE TABLE supplements (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        timestamp DATETIME NOT NULL,
         supplement_name TEXT NOT NULL,
+        default_amount REAL NOT NULL DEFAULT 1
+    )
+    ''')
+    
+    # Create supplement_intake table
+    cursor.execute('''
+    CREATE TABLE supplement_intake (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        timestamp DATETIME NOT NULL,
+        supplement_id INTEGER REFERENCES supplements(id),
         supplement_amount REAL NOT NULL
     )
     ''')
@@ -78,7 +87,8 @@ def init_database():
     cursor.execute('CREATE INDEX idx_insulin_timestamp ON insulin(timestamp)')
     cursor.execute('CREATE INDEX idx_intake_timestamp ON intake(timestamp)')
     cursor.execute('CREATE INDEX idx_intake_nutrition_id ON intake(nutrition_id)')
-    cursor.execute('CREATE INDEX idx_supplements_timestamp ON supplements(timestamp)')
+    cursor.execute('CREATE INDEX idx_supplement_intake_timestamp ON supplement_intake(timestamp)')
+    cursor.execute('CREATE INDEX idx_supplement_intake_supplement_id ON supplement_intake(supplement_id)')
     cursor.execute('CREATE INDEX idx_event_timestamp ON event(timestamp)')
     
     conn.commit()

@@ -102,7 +102,29 @@ CREATE TABLE nutrition (
     weight REAL NOT NULL,
     kcal_per_gram REAL GENERATED ALWAYS AS (kcal / weight) STORED
 );
+
+-- Performance indexes
+CREATE INDEX idx_glucose_timestamp ON glucose(timestamp);
+CREATE INDEX idx_insulin_timestamp ON insulin(timestamp);
+CREATE INDEX idx_intake_timestamp ON intake(timestamp);
+CREATE INDEX idx_intake_nutrition_id ON intake(nutrition_id);
+CREATE INDEX idx_supplement_intake_timestamp ON supplement_intake(timestamp);
+CREATE INDEX idx_supplement_intake_supplement_id ON supplement_intake(supplement_id);
+CREATE INDEX idx_event_timestamp ON event(timestamp);
 ```
+
+## Indexing Strategy
+
+**Full Timestamp Indexes:**
+All timestamp columns are indexed with full datetime values (not date-part) because:
+1. All queries use `BETWEEN` with full datetime strings (e.g., `'2026-02-22 00:00:00' AND '2026-02-22 23:59:59'`)
+2. SQLite B-tree efficiently handles string prefix matching on ISO8601 format
+3. Date-part extraction (e.g., `DATE(timestamp)`) would add overhead without benefit
+4. Supports both range queries and point queries (e.g., `WHERE timestamp <= ?`)
+
+**Foreign Key Indexes:**
+- `intake.nutrition_id` and `supplement_intake.supplement_id` are indexed for JOIN operations
+- Improves audit/edit listing performance when filtering by specific items
 
 # User Interface
 
@@ -313,9 +335,15 @@ The application supports mutual TLS authentication to ensure secure, authenticat
 - Enforces minimum TLS version (TLS 1.2 or higher)
 
 **Configuration:**
+
+**Environment Variables:**
+- `PORT` - Server listening port (default: 8443)
+- `MTLS_ENABLED` - Enable/disable mTLS (default: true, set to "false" for development)
+
+**Certificate Configuration:**
 - Certificate paths configurable via environment variables or config file
 - Default certificate directory: `certs/`
-- Required files:
+- Required files (when MTLS_ENABLED=true):
   - `certs/ca/ca-cert.pem` - Certificate Authority certificate
   - `certs/server/server-cert.pem` - Server certificate
   - `certs/server/server-key.pem` - Server private key
@@ -482,3 +510,88 @@ The application supports mutual TLS authentication to ensure secure, authenticat
 - Consider using proper CA for production (not self-signed)
 - Document certificate renewal process
 - Backup CA private key securely (required for issuing new client certs)
+
+---
+
+# Database Performance & Indexing
+
+## Current Indexing Strategy
+
+All timestamp columns are indexed for optimal query performance:
+
+```sql
+CREATE INDEX idx_glucose_timestamp ON glucose(timestamp);
+CREATE INDEX idx_insulin_timestamp ON insulin(timestamp);
+CREATE INDEX idx_intake_timestamp ON intake(timestamp);
+CREATE INDEX idx_supplement_intake_timestamp ON supplement_intake(timestamp);
+CREATE INDEX idx_event_timestamp ON event(timestamp);
+
+-- Foreign key indexes
+CREATE INDEX idx_intake_nutrition_id ON intake(nutrition_id);
+CREATE INDEX idx_supplement_intake_supplement_id ON supplement_intake(supplement_id);
+```
+
+## Query Pattern Analysis
+
+### Timestamp Queries
+All date-based queries use **BETWEEN** clauses with full datetime strings:
+- `WHERE timestamp BETWEEN '2026-02-22 00:00:00' AND '2026-02-22 23:59:59'`
+- `WHERE timestamp <= ? ORDER BY timestamp DESC LIMIT 1`
+
+### Why Full Timestamp Indexes Are Optimal
+
+**SQLite Implementation:**
+- Stores DATETIME as text in ISO8601 format (`YYYY-MM-DD HH:MM:SS`)
+- B-tree indexes efficiently handle string prefix matching
+- BETWEEN queries leverage lexicographic ordering
+
+**Performance Characteristics:**
+1. **BETWEEN queries**: Index scan from start to end of range - O(log n + k) where k = matching rows
+2. **ORDER BY timestamp**: Direct index traversal - no additional sorting needed
+3. **<= comparisons**: Index scan with LIMIT 1 - O(log n)
+
+### Date-Part Indexing (Not Recommended)
+
+**Alternative approach:**
+```sql
+CREATE INDEX idx_glucose_date ON glucose(DATE(timestamp));
+```
+
+**Why we DON'T use this:**
+1. **Function overhead**: `DATE(timestamp)` adds computation for every row scan
+2. **No benefit**: Our queries already use BETWEEN with full timestamps, not `DATE(timestamp) = ?`
+3. **Index bloat**: Would require maintaining both date and timestamp indexes
+4. **Query incompatibility**: Would not help existing queries without rewriting them
+
+### Composite Indexes
+
+Current foreign key indexes support:
+- **intake**: Filtering by nutrition_id (for audit/edit listings)
+- **supplement_intake**: Filtering by supplement_id (for audit/edit listings)
+
+These are optimal for current query patterns.
+
+## Indexing Best Practices Applied
+
+ **Primary keys**: Auto-indexed by SQLite  
+ **Foreign keys**: Explicitly indexed for JOIN operations  
+ **Timestamp columns**: Single-column indexes for range and point queries  
+ **Minimal indexes**: No redundant or unused indexes  
+ **Query-aligned**: Indexes match actual WHERE and ORDER BY clauses  
+
+## Performance Monitoring
+
+**Recommended SQLite analysis commands:**
+```bash
+# Check index usage
+EXPLAIN QUERY PLAN SELECT * FROM glucose WHERE timestamp BETWEEN ? AND ?;
+
+# Check index statistics
+ANALYZE;
+SELECT * FROM sqlite_stat1;
+```
+
+**When to re-evaluate:**
+- If query patterns change (e.g., adding GROUP BY DATE(timestamp))
+- If dataset grows beyond 1M rows per table
+- If specific queries show performance degradation
