@@ -57,20 +57,59 @@ async function loadGlucoseChart() {
             type: 'line',
             data: {
                 labels: data.map(d => d.week),
-                datasets: [{
-                    label: 'Time-Weighted Mean Glucose (mg/dL)',
-                    data: data.map(d => d.mean),
-                    borderColor: '#667eea',
-                    backgroundColor: 'rgba(102, 126, 234, 0.1)',
-                    tension: 0.1
-                }]
+                datasets: [
+                    {
+                        label: 'Glucose (mg/dL)',
+                        data: data.map(d => d.glucose_mean),
+                        borderColor: '#667eea',
+                        backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                        tension: 0.1,
+                        yAxisID: 'yAxisGlucose'
+                    },
+                    {
+                        label: 'Insulin (units)',
+                        data: data.map(d => d.insulin_mean),
+                        borderColor: '#f6993f',
+                        backgroundColor: 'rgba(246, 153, 63, 0.1)',
+                        tension: 0.1,
+                        yAxisID: 'yAxisInsulin'
+                    }
+                ]
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: true,
+                interaction: {
+                    mode: 'index',
+                    intersect: false
+                },
                 scales: {
-                    y: {
-                        beginAtZero: false
+                    yAxisGlucose: {
+                        type: 'linear',
+                        position: 'left',
+                        beginAtZero: false,
+                        title: {
+                            display: true,
+                            text: 'Glucose (mg/dL)'
+                        }
+                    },
+                    yAxisInsulin: {
+                        type: 'linear',
+                        position: 'right',
+                        beginAtZero: false,
+                        title: {
+                            display: true,
+                            text: 'Insulin (units)'
+                        },
+                        grid: {
+                            drawOnChartArea: false
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'top'
                     }
                 }
             }

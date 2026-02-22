@@ -94,6 +94,48 @@ def calculate_weekly_mean(rows):
     return result
 
 
+def calculate_weekly_mean_both(glucose_rows, insulin_rows):
+    """Group glucose and insulin data by week and calculate time-weighted mean for both."""
+    weekly_glucose = defaultdict(list)
+    weekly_insulin = defaultdict(list)
+    all_weeks = set()
+    
+    # Group glucose data by week
+    for timestamp_str, level in glucose_rows:
+        dt = datetime.strptime(timestamp_str, '%Y-%m-%d %H:%M:%S')
+        iso_year, iso_week, _ = dt.isocalendar()
+        week_key = f'{iso_year}/W{iso_week:02d}'
+        weekly_glucose[week_key].append((dt, level))
+        all_weeks.add(week_key)
+    
+    # Group insulin data by week
+    for timestamp_str, level in insulin_rows:
+        dt = datetime.strptime(timestamp_str, '%Y-%m-%d %H:%M:%S')
+        iso_year, iso_week, _ = dt.isocalendar()
+        week_key = f'{iso_year}/W{iso_week:02d}'
+        weekly_insulin[week_key].append((dt, level))
+        all_weeks.add(week_key)
+    
+    result = []
+    for week_key in sorted(all_weeks):
+        glucose_mean = None
+        insulin_mean = None
+        
+        if week_key in weekly_glucose and len(weekly_glucose[week_key]) >= 2:
+            glucose_mean = calculate_time_weighted_mean(weekly_glucose[week_key])
+        
+        if week_key in weekly_insulin and len(weekly_insulin[week_key]) >= 2:
+            insulin_mean = calculate_time_weighted_mean(weekly_insulin[week_key])
+        
+        result.append({
+            'week': week_key,
+            'glucose_mean': round(glucose_mean, 2) if glucose_mean is not None else None,
+            'insulin_mean': round(insulin_mean, 2) if insulin_mean is not None else None
+        })
+    
+    return result
+
+
 def get_previous_time_window():
     """Calculate previous 12-hour time window."""
     now = datetime.now()
@@ -606,12 +648,18 @@ class GlucoseHandler(http.server.SimpleHTTPRequestHandler):
         start_date = query_params.get('start_date', [f'{today.year}-01-01'])[0]
         end_date = query_params.get('end_date', [f'{today.year}-12-31'])[0]
         
-        query = '''SELECT timestamp, level FROM glucose 
-                  WHERE timestamp BETWEEN ? AND ? 
-                  ORDER BY timestamp'''
+        glucose_query = '''SELECT timestamp, level FROM glucose 
+                          WHERE timestamp BETWEEN ? AND ? 
+                          ORDER BY timestamp'''
         
-        rows = execute_query(query, (start_date, end_date + ' 23:59:59'))
-        weekly_data = calculate_weekly_mean(rows)
+        insulin_query = '''SELECT timestamp, level FROM insulin 
+                          WHERE timestamp BETWEEN ? AND ? 
+                          ORDER BY timestamp'''
+        
+        glucose_rows = execute_query(glucose_query, (start_date, end_date + ' 23:59:59'))
+        insulin_rows = execute_query(insulin_query, (start_date, end_date + ' 23:59:59'))
+        
+        weekly_data = calculate_weekly_mean_both(glucose_rows, insulin_rows)
         self._send_json(weekly_data)
     
     def handle_get_summary(self, query_params):

@@ -224,15 +224,58 @@ This form supports multiple nutrition and supplement items sharing the same time
 ### 1. Glucose Level Chart
 
 **Visualization:**
-- Line chart showing time-weighted average glucose levels
+- Multi-axis line chart displaying both glucose and insulin levels
+- **Left Y-axis**: Glucose levels (mg/dL)
+- **Right Y-axis**: Insulin levels (units)
+- Two series plotted on same X-axis (time):
+  1. Glucose level series (time-weighted average) - blue line
+  2. Insulin level series (time-weighted average) - orange line
 
 **Time-Weighted Mean Calculation:**
 - Uses trapezoidal rule: `Σ((v0 + v1) / 2 × Δt) / total_time`
 - Implements the algorithm from `time-weighted-mean.py`
+- Applied independently to both glucose and insulin measurements
+- Data grouped by week (ISO week numbering)
+
+**Implementation Details:**
+
+**Backend:**
+- New API endpoint: `/api/dashboard/glucose-chart`
+  - Accepts parameters: `start_date`, `end_date` (defaults to current year)
+  - Returns JSON array with weekly data for both glucose and insulin:
+    ```json
+    [
+      {
+        "week": "2026/W08",
+        "glucose_mean": 125.5,
+        "insulin_mean": 8.3
+      },
+      ...
+    ]
+    ```
+- Query glucose table: `SELECT timestamp, level FROM glucose WHERE timestamp BETWEEN ? AND ?`
+- Query insulin table: `SELECT timestamp, level FROM insulin WHERE timestamp BETWEEN ? AND ?`
+- Group both datasets by ISO week
+- Calculate time-weighted mean for each week for both glucose and insulin
+- Return combined weekly results
+
+**Frontend:**
+- Use Chart.js library with multi-axis configuration
+- Two Y-axes configuration:
+  - `yAxisGlucose` (left): Position 'left', title 'Glucose (mg/dL)'
+  - `yAxisInsulin` (right): Position 'right', title 'Insulin (units)'
+- Two datasets:
+  - Glucose dataset: `yAxisID: 'yAxisGlucose'`, borderColor: '#667eea' (blue)
+  - Insulin dataset: `yAxisID: 'yAxisInsulin'`, borderColor: '#f6993f' (orange)
+- Legend enabled showing both series
 
 **Features:**
 - Adjustable time range filter (start date and end date)
 - **Default range:** Current year (dynamically calculated based on current date)
+- Dual Y-axes for independent scaling of glucose and insulin values
+- Color-coded series: blue for glucose, orange for insulin
+- Legend indicating which series corresponds to which axis
+- Responsive design for mobile and desktop viewing
 
 ---
 

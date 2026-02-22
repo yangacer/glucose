@@ -394,7 +394,7 @@ class TestGlucoseAPI(unittest.TestCase):
         self.assertIsInstance(response['supplements'], list)
     
     def test_16_get_glucose_chart(self):
-        """Test glucose chart data endpoint"""
+        """Test glucose chart data endpoint with both glucose and insulin series"""
         today = datetime.now()
         start_date = f'{today.year}-01-01'
         end_date = f'{today.year}-12-31'
@@ -402,6 +402,13 @@ class TestGlucoseAPI(unittest.TestCase):
         status, response = self.make_request('GET', f'/api/dashboard/glucose-chart?start_date={start_date}&end_date={end_date}')
         self.assertEqual(status, 200)
         self.assertIsInstance(response, list)
+        
+        # Verify response structure if data exists
+        if len(response) > 0:
+            row = response[0]
+            self.assertIn('week', row)
+            self.assertIn('glucose_mean', row)
+            self.assertIn('insulin_mean', row)
     
     def test_17_get_summary_timesheet(self):
         """Test summary timesheet endpoint with 12 glucose columns (+0 to +11)"""
@@ -422,11 +429,11 @@ class TestGlucoseAPI(unittest.TestCase):
             self.assertIn('glucose_levels', row)
             self.assertIn('kcal_intake', row)
             
-            # Verify glucose_levels has +0hr to +11hr (12 columns total)
+            # Verify glucose_levels has +0 to +11 (12 columns total)
             glucose_levels = row['glucose_levels']
-            self.assertIn('+0hr', glucose_levels)
+            self.assertIn('+0', glucose_levels)
             for hour in range(1, 12):
-                self.assertIn(f'+{hour}hr', glucose_levels)
+                self.assertIn(f'+{hour}', glucose_levels)
             
             # Verify overlay data (not in main table)
             self.assertIn('dose_time', row)
