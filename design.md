@@ -260,8 +260,7 @@ Groups data by 12-hour time windows showing glucose trends and intake informatio
 | **AM/PM** | Time window indicator |
 | **Date** | Calendar date |
 | **Dosage** | Amount of most recent insulin dose |
-| **Glucose Level before intake** | Glucose reading before first intake (with color coding) |
-| **Glucose level +1hr** through **+12hr** | Glucose readings at hourly intervals after first intake (with color coding) |
+| **Glucose Level +0** through **+11** | Glucose readings at hourly intervals (with color coding) |
 | **kCal Intake** | Total kcal sum for the window |
 
 **Glucose Level Color Coding:**

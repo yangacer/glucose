@@ -177,19 +177,19 @@ def process_time_window_summary(cursor, am_pm, date_str, window_start, window_en
 
 
 def get_glucose_levels_around_intake(cursor, first_intake_time, intake_dt):
-    """Get glucose levels before and hourly after intake."""
+    """Get glucose levels at and after intake (0 to 11 hours)."""
     glucose_levels = {}
     
-    # Before intake
+    # +0: Most recent glucose before or at intake time
     cursor.execute('''SELECT level FROM glucose
                      WHERE timestamp <= ?
                      ORDER BY timestamp DESC LIMIT 1''',
                   (first_intake_time,))
-    before_row = cursor.fetchone()
-    glucose_levels['before'] = before_row[0] if before_row else None
+    zero_row = cursor.fetchone()
+    glucose_levels['+0'] = zero_row[0] if zero_row else None
     
-    # After intake (+1hr to +12hr)
-    for hour in range(1, 13):
+    # +1 to +11: Average glucose in ±30min window after intake
+    for hour in range(1, 12):
         target_time = intake_dt + timedelta(hours=hour)
         
         # Get average glucose in ±30min window
@@ -200,7 +200,7 @@ def get_glucose_levels_around_intake(cursor, first_intake_time, intake_dt):
                          WHERE timestamp BETWEEN ? AND ?''',
                       (window_start_time, window_end_time))
         avg_row = cursor.fetchone()
-        glucose_levels[f'+{hour}hr'] = round(avg_row[0], 1) if avg_row[0] else None
+        glucose_levels[f'+{hour}'] = round(avg_row[0], 1) if avg_row[0] else None
     
     return glucose_levels
 

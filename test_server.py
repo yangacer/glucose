@@ -404,7 +404,7 @@ class TestGlucoseAPI(unittest.TestCase):
         self.assertIsInstance(response, list)
     
     def test_17_get_summary_timesheet(self):
-        """Test summary timesheet endpoint"""
+        """Test summary timesheet endpoint with 12 glucose columns (+0 to +11)"""
         today = datetime.now()
         start_date = f'{today.year}-{today.month:02d}-01'
         end_date = today.strftime('%Y-%m-%d')
@@ -412,6 +412,28 @@ class TestGlucoseAPI(unittest.TestCase):
         status, response = self.make_request('GET', f'/api/dashboard/summary?start_date={start_date}&end_date={end_date}')
         self.assertEqual(status, 200)
         self.assertIsInstance(response, list)
+        
+        # Verify timesheet structure if data exists
+        if len(response) > 0:
+            row = response[0]
+            self.assertIn('am_pm', row)
+            self.assertIn('date', row)
+            self.assertIn('dosage', row)
+            self.assertIn('glucose_levels', row)
+            self.assertIn('kcal_intake', row)
+            
+            # Verify glucose_levels has +0hr to +11hr (12 columns total)
+            glucose_levels = row['glucose_levels']
+            self.assertIn('+0hr', glucose_levels)
+            for hour in range(1, 12):
+                self.assertIn(f'+{hour}hr', glucose_levels)
+            
+            # Verify overlay data (not in main table)
+            self.assertIn('dose_time', row)
+            self.assertIn('intake_time', row)
+            self.assertIn('nutrition', row)
+            self.assertIn('grouped_supplements', row)
+            self.assertIn('grouped_events', row)
     
     def test_18_filter_by_date_range(self):
         """Test filtering records by date range"""
