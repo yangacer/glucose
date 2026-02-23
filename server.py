@@ -141,17 +141,24 @@ def get_previous_time_window():
     now = datetime.now()
     current_hour = now.hour
     
-    if current_hour < 12:  # Current is AM, previous is yesterday PM
-        prev_start = (now - timedelta(days=1)).strftime('%Y-%m-%d') + ' 12:00:00'
-        prev_end = (now - timedelta(days=1)).strftime('%Y-%m-%d') + ' 23:59:59'
-    else:  # Current is PM, previous is today AM
-        prev_start = now.strftime('%Y-%m-%d') + ' 00:00:00'
-        prev_end = now.strftime('%Y-%m-%d') + ' 11:59:59'
+    if 5 <= current_hour < 17:  # Current is Day (05:00-16:59), previous is Night
+        # Previous night window: 17:00 yesterday to 04:59 today
+        prev_start = (now - timedelta(days=1)).strftime('%Y-%m-%d') + ' 17:00:00'
+        prev_end = now.strftime('%Y-%m-%d') + ' 04:59:59'
+    else:  # Current is Night (17:00-04:59), previous is Day
+        if current_hour >= 17:  # Evening (17:00-23:59)
+            # Previous day window: 05:00 to 16:59 today
+            prev_start = now.strftime('%Y-%m-%d') + ' 05:00:00'
+            prev_end = now.strftime('%Y-%m-%d') + ' 16:59:59'
+        else:  # Early morning (00:00-04:59)
+            # Previous day window: 05:00 to 16:59 yesterday
+            prev_start = (now - timedelta(days=1)).strftime('%Y-%m-%d') + ' 05:00:00'
+            prev_end = (now - timedelta(days=1)).strftime('%Y-%m-%d') + ' 16:59:59'
     
     return prev_start, prev_end
 
 
-def process_time_window_summary(cursor, am_pm, date_str, window_start, window_end):
+def process_time_window_summary(cursor, window_icon, date_str, window_start, window_end):
     """Process and aggregate data for a 12-hour time window."""
     # Get all intakes in this window
     cursor.execute('''SELECT i.timestamp, i.nutrition_kcal, i.nutrition_amount, n.nutrition_name
@@ -162,17 +169,22 @@ def process_time_window_summary(cursor, am_pm, date_str, window_start, window_en
                   (window_start, window_end))
     intakes = cursor.fetchall()
     
-    if not intakes:
-        return None
-    
-    # Use first intake time as reference
-    first_intake_time = intakes[0][0]
-    intake_dt = datetime.strptime(first_intake_time, '%Y-%m-%d %H:%M:%S')
-    
-    # Aggregate nutrition data
-    total_kcal = sum(row[1] for row in intakes)
-    nutrition_items = [f"{row[3]} ({row[1]:.1f} kcal)" for row in intakes]
-    nutrition_str = ', '.join(nutrition_items)
+    # Determine reference time for glucose levels
+    if intakes:
+        # Use first intake time as reference
+        first_intake_time = intakes[0][0]
+        intake_dt = datetime.strptime(first_intake_time, '%Y-%m-%d %H:%M:%S')
+        
+        # Aggregate nutrition data
+        total_kcal = sum(row[1] for row in intakes)
+        nutrition_items = [f"{row[3]} ({row[1]:.1f} kcal)" for row in intakes]
+        nutrition_str = ', '.join(nutrition_items)
+    else:
+        # No intake, use window start as reference
+        first_intake_time = None
+        intake_dt = datetime.strptime(window_start, '%Y-%m-%d %H:%M:%S')
+        total_kcal = 0
+        nutrition_str = ''
     
     # Get insulin dose in this window
     cursor.execute('''SELECT timestamp, level FROM insulin
@@ -183,8 +195,8 @@ def process_time_window_summary(cursor, am_pm, date_str, window_start, window_en
     dose_time = insulin_row[0] if insulin_row else None
     dosage = insulin_row[1] if insulin_row else None
     
-    # Get glucose levels before and after intake
-    glucose_levels = get_glucose_levels_around_intake(cursor, first_intake_time, intake_dt)
+    # Get glucose levels based on reference time
+    glucose_levels = get_glucose_levels_around_intake(cursor, intake_dt.strftime('%Y-%m-%d %H:%M:%S'), intake_dt)
     
     # Get events in window
     cursor.execute('''SELECT event_name FROM event
@@ -204,8 +216,13 @@ def process_time_window_summary(cursor, am_pm, date_str, window_start, window_en
     supplements = cursor.fetchall()
     grouped_supplements = ', '.join([f"{s[0]} {s[1]}" for s in supplements]) if supplements else ''
     
+    # Check if there's any data in this window
+    has_data = intakes or insulin_row or events or supplements
+    if not has_data:
+        return None
+    
     return {
-        'am_pm': am_pm,
+        'am_pm': window_icon,
         'date': date_str,
         'dose_time': dose_time,
         'intake_time': first_intake_time,
@@ -688,21 +705,22 @@ class GlucoseHandler(http.server.SimpleHTTPRequestHandler):
         while current_dt <= end_dt:
             date_str = current_dt.strftime('%Y-%m-%d')
             
-            # Process AM window (00:00-12:00)
-            am_window_start = f'{date_str} 00:00:00'
-            am_window_end = f'{date_str} 11:59:59'
-            am_data = process_time_window_summary(cursor, 'AM', date_str, 
-                                                 am_window_start, am_window_end)
-            if am_data:
-                summary_data.append(am_data)
+            # Process Day window (05:00-16:59)
+            day_window_start = f'{date_str} 05:00:00'
+            day_window_end = f'{date_str} 16:59:59'
+            day_data = process_time_window_summary(cursor, '☀️', date_str, 
+                                                 day_window_start, day_window_end)
+            if day_data:
+                summary_data.append(day_data)
             
-            # Process PM window (12:00-24:00)
-            pm_window_start = f'{date_str} 12:00:00'
-            pm_window_end = f'{date_str} 23:59:59'
-            pm_data = process_time_window_summary(cursor, 'PM', date_str, 
-                                                 pm_window_start, pm_window_end)
-            if pm_data:
-                summary_data.append(pm_data)
+            # Process Night window (17:00 to 04:59 next day)
+            night_window_start = f'{date_str} 17:00:00'
+            next_day = (current_dt + timedelta(days=1)).strftime('%Y-%m-%d')
+            night_window_end = f'{next_day} 04:59:59'
+            night_data = process_time_window_summary(cursor, '🌙', date_str, 
+                                                 night_window_start, night_window_end)
+            if night_data:
+                summary_data.append(night_data)
             
             current_dt += timedelta(days=1)
         

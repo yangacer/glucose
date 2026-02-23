@@ -367,10 +367,16 @@ class TestGlucoseAPI(unittest.TestCase):
         """Test getting previous time-window intake"""
         # Create intake in previous window
         now = datetime.now()
-        if now.hour < 12:  # AM - previous is yesterday PM
-            prev_time = (now - timedelta(days=1)).replace(hour=14, minute=0, second=0)
-        else:  # PM - previous is today AM
-            prev_time = now.replace(hour=8, minute=0, second=0)
+        if 5 <= now.hour < 17:  # Current is Day, previous is Night
+            # Previous night window: 17:00 yesterday to 04:59 today
+            prev_time = (now - timedelta(days=1)).replace(hour=20, minute=0, second=0)
+        else:  # Current is Night (17:00-04:59), previous is Day
+            if now.hour >= 17:  # Evening
+                # Previous day window: 05:00 to 16:59 today
+                prev_time = now.replace(hour=10, minute=0, second=0)
+            else:  # Early morning (00:00-04:59)
+                # Previous day window: 05:00 to 16:59 yesterday
+                prev_time = (now - timedelta(days=1)).replace(hour=10, minute=0, second=0)
         
         # Get nutrition ID
         status, nutrition_list = self.make_request('GET', '/api/nutrition')

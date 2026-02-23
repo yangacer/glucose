@@ -285,12 +285,12 @@ This form supports multiple nutrition and supplement items sharing the same time
 Groups data by 12-hour time windows showing glucose trends and intake information.
 
 **Time Window Definition:**
-- Fixed non-overlapping windows: AM (00:00-12:00) and PM (12:00-24:00)
+- Fixed non-overlapping windows: ☀️  (05:00-16:59) and 🌙 (17:00-04:59 next day)
 - Each row represents one 12-hour period
 
 **Assumptions:**
 - Food intake occurs once per 12-hour period
-- Intake may consist of multiple nutrition items with same/similar timestamps
+- Intake may consist of multiple nutrition items with same timestamps
 
 **Features:**
 - Adjustable time range filter (start date and end date)
@@ -300,11 +300,17 @@ Groups data by 12-hour time windows showing glucose trends and intake informatio
 
 | Column | Description |
 |--------|-------------|
-| **AM/PM** | Time window indicator |
-| **Date** | Calendar date |
-| **Dosage** | Amount of most recent insulin dose |
-| **Glucose Level +0** through **+11** | Glucose readings at hourly intervals (with color coding) |
-| **kCal Intake** | Total kcal sum for the window |
+| **☀️ /🌙** | Time window indicator |
+| **Date** | Calendar date of a window start time |
+| **Dosage** | Sum of insulin dose of a window |
+| **Glucose Level +0** through **+11** | Glucose readings at hourly intervals (with color coding) relative to a window start time |
+| **kCal** | Total kcal sum for a window |
+
+Header of the above table looks like this:
+
+|  | **Date** | **Dosage** | **+0** | **+1** | **+2** | **+3** | **+4** | **+5** | **+6** | **+7** | **+8** | **+9** | **+10** | **+11** | **kCal** |
+
+Note the first column of the header is reserved for the time window indicator (☀️ or 🌙) and is not labeled.
 
 **Glucose Level Color Coding:**
 
