@@ -185,6 +185,9 @@ This form supports multiple nutrition and supplement items sharing the same time
 
 **Audit & Edit:** Two separate sections:
 1. **"Nutrition"** listing (intake table records)
+   - Shows recent intake records with Edit and Delete buttons
+   - Edit button populates form with existing values for modification
+   - Delete button removes the record after confirmation
 2. **"Supplements"** listing (supplement_intake table records)
 - Both share the same date range filters
 

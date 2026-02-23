@@ -181,11 +181,98 @@ async function loadIntakeAudit() {
             <td>${record.nutrition_amount}</td>
             <td>${record.nutrition_kcal.toFixed(1)}</td>
             <td>
+                <button class="edit-btn" onclick="editIntake(${record.id}, '${record.timestamp}', ${record.nutrition_id}, '${escapeHtml(record.nutrition_name)}', ${record.nutrition_amount})">Edit</button>
                 <button class="delete-btn" onclick="deleteIntake(${record.id})">Delete</button>
             </td>
         `;
         tbody.appendChild(tr);
     });
+}
+
+/**
+ * Edit intake record - populates form with existing values
+ */
+async function editIntake(id, timestamp, nutritionId, nutritionName, nutritionAmount) {
+    // Store the record ID being edited
+    window.currentEditingIntakeId = id;
+    
+    // Clear and set up form for single item edit
+    const nutritionContainer = document.getElementById('nutrition-items-container');
+    nutritionContainer.innerHTML = `
+        <div class="nutrition-item">
+            <h4>Nutrition Item 1</h4>
+            <label>Nutrition: 
+                <select name="nutrition_id[]" class="nutrition-select" required>
+                    <option value="">Select nutrition...</option>
+                </select>
+            </label>
+            <label>Amount (gram): <input type="number" name="nutrition_amount[]" required min="0" step="0.1"></label>
+            <button type="button" class="remove-nutrition-btn" style="display:none;">Remove</button>
+        </div>
+    `;
+    
+    // Clear supplements section for edit mode
+    const supplementContainer = document.getElementById('supplement-items-container');
+    supplementContainer.innerHTML = '';
+    
+    // Hide add buttons during edit
+    document.getElementById('add-nutrition-btn').style.display = 'none';
+    document.getElementById('add-supplement-btn').style.display = 'none';
+    
+    // Load nutrition options and set selected value
+    await loadNutritionOptions();
+    const nutritionSelect = document.querySelector('.nutrition-select');
+    nutritionSelect.value = nutritionId;
+    
+    // Set timestamp
+    const timestampInput = document.getElementById('intake-timestamp');
+    timestampInput.value = toInputTimestamp(timestamp);
+    
+    // Set amount
+    const amountInput = document.querySelector('input[name="nutrition_amount[]"]');
+    amountInput.value = nutritionAmount;
+    
+    // Change submit button to Update
+    const submitBtn = document.querySelector('#intakeForm button[type="submit"]');
+    submitBtn.textContent = 'Update';
+    submitBtn.classList.add('update-mode');
+    
+    // Add cancel button if not exists
+    if (!document.getElementById('cancel-edit-btn')) {
+        const cancelBtn = document.createElement('button');
+        cancelBtn.type = 'button';
+        cancelBtn.id = 'cancel-edit-btn';
+        cancelBtn.textContent = 'Cancel Edit';
+        cancelBtn.className = 'secondary-btn';
+        cancelBtn.onclick = cancelIntakeEdit;
+        submitBtn.parentNode.insertBefore(cancelBtn, submitBtn.nextSibling);
+    }
+    
+    // Scroll to form
+    document.getElementById('intake').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+/**
+ * Cancel intake edit mode and return to create mode
+ */
+function cancelIntakeEdit() {
+    window.currentEditingIntakeId = null;
+    resetIntakeForm();
+    
+    // Show add buttons
+    document.getElementById('add-nutrition-btn').style.display = 'inline-block';
+    document.getElementById('add-supplement-btn').style.display = 'inline-block';
+    
+    // Change button back to Submit
+    const submitBtn = document.querySelector('#intakeForm button[type="submit"]');
+    submitBtn.textContent = 'Submit All';
+    submitBtn.classList.remove('update-mode');
+    
+    // Remove cancel button
+    const cancelBtn = document.getElementById('cancel-edit-btn');
+    if (cancelBtn) {
+        cancelBtn.remove();
+    }
 }
 
 /**

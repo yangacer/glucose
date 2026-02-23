@@ -104,6 +104,46 @@ async function handleIntakeSubmit(e) {
     e.preventDefault();
     const formData = new FormData(e.target);
     const timestamp = toDbTimestamp(formData.get('timestamp'));
+    
+    // Check if we're in edit mode
+    if (window.currentEditingIntakeId) {
+        // Edit mode - single nutrition item
+        const nutritionId = formData.get('nutrition_id[]');
+        const nutritionAmount = formData.get('nutrition_amount[]');
+        
+        if (!nutritionId) {
+            showMessage('intake-message', false, 'Please select a nutrition item');
+            return;
+        }
+        
+        const data = {
+            timestamp: timestamp,
+            nutrition_id: parseInt(nutritionId),
+            nutrition_amount: parseFloat(nutritionAmount)
+        };
+        
+        try {
+            const response = await fetch(`${API_BASE}/intake/${window.currentEditingIntakeId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            
+            if (response.ok) {
+                showMessage('intake-message', true, 'Record updated successfully!');
+                cancelIntakeEdit();
+                loadIntakeAudit();
+            } else {
+                const error = await response.json();
+                showMessage('intake-message', false, error.error || 'Update failed');
+            }
+        } catch (err) {
+            showMessage('intake-message', false, 'Network error: ' + err.message);
+        }
+        return;
+    }
+    
+    // Create mode - multiple items
     const nutritionIds = formData.getAll('nutrition_id[]');
     const nutritionAmounts = formData.getAll('nutrition_amount[]');
     const supplementIds = formData.getAll('supplement_id[]');
@@ -195,6 +235,25 @@ function resetIntakeForm() {
     
     nutritionItemCount = 1;
     supplementItemCount = 1;
+    
+    // Ensure add buttons are visible
+    document.getElementById('add-nutrition-btn').style.display = 'inline-block';
+    document.getElementById('add-supplement-btn').style.display = 'inline-block';
+    
+    // Reset submit button text
+    const submitBtn = document.querySelector('#intakeForm button[type="submit"]');
+    submitBtn.textContent = 'Submit All';
+    submitBtn.classList.remove('update-mode');
+    
+    // Remove cancel button if exists
+    const cancelBtn = document.getElementById('cancel-edit-btn');
+    if (cancelBtn) {
+        cancelBtn.remove();
+    }
+    
+    // Clear edit mode
+    window.currentEditingIntakeId = null;
+    
     loadNutritionOptions();
     loadSupplementOptions();
 }

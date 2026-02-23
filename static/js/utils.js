@@ -107,3 +107,23 @@ function resetToNow(inputId) {
         input.value = timestamp;
     }
 }
+
+/**
+ * Convert database timestamp to datetime-local format
+ * @param {string} dbTimestamp - Database timestamp (YYYY-MM-DD HH:MM:SS)
+ * @returns {string} Datetime local format (YYYY-MM-DDTHH:MM)
+ */
+function toInputTimestamp(dbTimestamp) {
+    return dbTimestamp.substring(0, 16).replace(' ', 'T');
+}
+
+/**
+ * Escape HTML to prevent XSS
+ * @param {string} text - Text to escape
+ * @returns {string} Escaped text
+ */
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
