@@ -282,7 +282,93 @@ This form supports multiple nutrition and supplement items sharing the same time
 
 ---
 
-### 2. Summary Timesheet
+### 2. CV Charts
+
+**Purpose:**
+Visualize glucose variability using Coefficient of Variation (CV) across different time scales.
+
+**Features:**
+- Adjustable end date filter (defaults to today)
+- Three independent CV charts with different time windows
+- All windows anchored at 5:00 AM as reference point
+
+**Charts:**
+
+1. **Last 7 Days per 12-hour CV**
+   - Time windows: Day (05:00-16:59) and Night (17:00-04:59 next day)
+   - Displays 14 data points (7 days × 2 windows)
+   - X-axis labels: "YYYY-MM-DD Day" or "YYYY-MM-DD Night"
+
+2. **Last 30 Days per 48-hour CV**
+   - Time windows: 48-hour periods from 5:00 AM day 1 to 5:00 AM day 3
+   - Displays approximately 15 data points
+   - X-axis labels: "YYYY-MM-DD to YYYY-MM-DD"
+
+3. **Last 30 Days per 5-day CV**
+   - Time windows: 5-day periods (120 hours) from 5:00 AM day 1 to 5:00 AM day 6
+   - Displays approximately 6 data points
+   - X-axis labels: "YYYY-MM-DD to YYYY-MM-DD"
+
+**CV Calculation:**
+```
+CV = (Standard Deviation / Time-Weighted Mean) × 100
+```
+- Standard Deviation: Classical standard deviation of all glucose readings in window
+- Time-Weighted Mean: Trapezoidal rule integration (reusing existing algorithm)
+- Result expressed as percentage
+
+**Implementation Details:**
+
+**Backend:**
+- New API endpoint: `/api/dashboard/cv-charts`
+  - Accepts parameters: `end_date` (defaults to today)
+  - Returns JSON with three arrays:
+    ```json
+    {
+      "cv_7d_12h": [{"label": "2026-02-19 Day", "cv": 3.49}, ...],
+      "cv_30d_48h": [{"label": "2026-01-27 to 2026-01-29", "cv": 12.34}, ...],
+      "cv_30d_5d": [{"label": "2026-01-27 to 2026-02-01", "cv": 10.56}, ...]
+    }
+    ```
+- Functions:
+  - `calculate_standard_deviation(data)` - Computes std dev of glucose values
+  - `calculate_cv(data)` - Computes CV percentage using time-weighted mean
+  - `generate_cv_windows(end_date, days, window_hours)` - Generates time window boundaries
+  - `calculate_cv_data(glucose_rows, windows)` - Aggregates CV per window
+
+**Frontend:**
+- Three Chart.js line charts with consistent styling
+- Blue color scheme matching existing glucose chart (#667eea)
+- Y-axis: CV percentage, beginning at zero
+- X-axis: Labels hidden but preserved for tooltip hover functionality
+- Responsive design for mobile and desktop viewing
+- Single "Update Charts" button refreshes all three charts
+
+**Visual Threshold Bands:**
+All CV charts display colored background bands to indicate glucose variability levels:
+- **Green band (CV 0-20%)**: Good glucose control with low variability
+  - Color: `rgba(0, 255, 0, 0.5)` (transparent green)
+- **Yellow band (CV 20-30%)**: Moderate variability, acceptable range
+  - Color: `rgba(255, 255, 0, 0.5)` (transparent yellow)
+- **Red band (CV > 30%)**: High variability, needs attention
+  - Color: `rgba(255, 0, 0, 0.5)` (transparent red)
+
+Bands are rendered as background boxes using Chart.js annotation plugin, allowing data points and line to appear on top for clear visibility.
+
+**Window Generation Logic:**
+- Anchor point: 5:00 AM on the selected end date
+- Walks backward in time creating fixed-size windows
+- Stops when total lookback exceeds specified days
+- Windows are non-overlapping and consecutive
+
+**Data Quality:**
+- Requires minimum 2 glucose readings per window for CV calculation
+- Null CV returned for windows with insufficient data
+- Handles edge cases (zero mean, single reading, empty windows)
+
+---
+
+### 3. Summary Timesheet
 
 **Purpose:**
 Groups data by 12-hour time windows showing glucose trends and intake information.
@@ -355,7 +441,7 @@ When a row is clicked, an overlay displays the following details:
 
 ---
 
-### 3. Nutrition List
+### 4. Nutrition List
 
 **Display:**
 Table listing all nutrition master records

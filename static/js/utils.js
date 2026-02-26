@@ -72,6 +72,7 @@ function initializeDateInputs() {
     const now = new Date();
     const year = now.getFullYear();
     const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
     
     // Chart dates - current year
     document.getElementById('chart-start-date').value = `${year}-01-01`;
@@ -81,6 +82,9 @@ function initializeDateInputs() {
     const lastDay = new Date(year, now.getMonth() + 1, 0).getDate();
     document.getElementById('summary-start-date').value = `${year}-${month}-01`;
     document.getElementById('summary-end-date').value = `${year}-${month}-${lastDay}`;
+    
+    // CV charts date - today
+    document.getElementById('cv-end-date').value = `${year}-${month}-${day}`;
 }
 
 /**

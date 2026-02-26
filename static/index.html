@@ -7,6 +7,7 @@
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🐈</text></svg>">
     <link rel="stylesheet" href="css/styles.css">
     <script src="js/chart.min.js"></script>
+    <script src="js/chartjs-plugin-annotation.min.js"></script>
 </head>
 <body>
     <div class="container">
@@ -34,6 +35,23 @@
                     <button onclick="loadGlucoseChart()">Update Chart</button>
                 </div>
                 <canvas id="glucoseChart"></canvas>
+            </section>
+
+            <section class="chart-section">
+                <h2>CV Charts</h2>
+                <div class="date-filter">
+                    <label>End Date: <input type="date" id="cv-end-date"></label>
+                    <button onclick="loadCVCharts()">Update Charts</button>
+                </div>
+                
+                <h3>Last 7 Days per 12-hour CV</h3>
+                <canvas id="cvChart7d12h"></canvas>
+                
+                <h3>Last 30 Days per 48-hour CV</h3>
+                <canvas id="cvChart30d48h"></canvas>
+                
+                <h3>Last 30 Days per 5-day CV</h3>
+                <canvas id="cvChart30d5d"></canvas>
             </section>
 
             <section class="summary-section">

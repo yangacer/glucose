@@ -545,6 +545,57 @@ class TestGlucoseAPI(unittest.TestCase):
         status, records_after = self.make_request('GET', '/api/supplement-intake')
         deleted_exists = any(r['id'] == record_id for r in records_after)
         self.assertFalse(deleted_exists)
+    
+    def test_23_cv_calculation(self):
+        """Test CV calculation function"""
+        from server import calculate_cv
+        from datetime import datetime
+        
+        test_data = [
+            (datetime(2026, 2, 20, 8, 0), 100),
+            (datetime(2026, 2, 20, 9, 0), 110),
+            (datetime(2026, 2, 20, 10, 0), 105),
+            (datetime(2026, 2, 20, 11, 0), 95),
+        ]
+        
+        cv = calculate_cv(test_data)
+        self.assertIsNotNone(cv)
+        self.assertGreater(cv, 0)
+        self.assertIsInstance(cv, float)
+    
+    def test_24_generate_cv_windows(self):
+        """Test CV window generation"""
+        from server import generate_cv_windows
+        from datetime import date
+        
+        end_date = date(2026, 2, 26)
+        
+        windows_12h = generate_cv_windows(end_date, 7, 12)
+        self.assertGreater(len(windows_12h), 0)
+        self.assertEqual(len(windows_12h), 14)
+        
+        windows_48h = generate_cv_windows(end_date, 30, 48)
+        self.assertGreater(len(windows_48h), 0)
+        
+        windows_5d = generate_cv_windows(end_date, 30, 120)
+        self.assertGreater(len(windows_5d), 0)
+    
+    def test_25_cv_charts_api(self):
+        """Test CV charts API endpoint"""
+        status, data = self.make_request('GET', '/api/dashboard/cv-charts?end_date=2026-02-26')
+        self.assertEqual(status, 200)
+        
+        self.assertIn('cv_7d_12h', data)
+        self.assertIn('cv_30d_48h', data)
+        self.assertIn('cv_30d_5d', data)
+        
+        for window in data['cv_7d_12h']:
+            self.assertIn('label', window)
+            self.assertIn('cv', window)
+        
+        self.assertIsInstance(data['cv_7d_12h'], list)
+        self.assertIsInstance(data['cv_30d_48h'], list)
+        self.assertIsInstance(data['cv_30d_5d'], list)
 
 def run_tests_with_server():
     """Run tests with a temporary test server"""

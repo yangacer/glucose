@@ -1,6 +1,9 @@
 // Dashboard functionality
 
 let glucoseChart = null;
+let cvChart7d12h = null;
+let cvChart30d48h = null;
+let cvChart30d5d = null;
 
 /**
  * Get color styling for glucose level
@@ -34,6 +37,7 @@ async function loadDashboard() {
     loadGlucoseChart();
     loadSummary();
     loadNutritionList();
+    loadCVCharts();
 }
 
 /**
@@ -247,5 +251,128 @@ async function loadNutritionList() {
         });
     } catch (err) {
         console.error('Failed to load nutrition list:', err);
+    }
+}
+
+/**
+ * Load and render CV charts
+ */
+async function loadCVCharts() {
+    const endDate = document.getElementById('cv-end-date').value;
+    
+    try {
+        const response = await fetch(`${API_BASE}/dashboard/cv-charts?end_date=${endDate}`);
+        const data = await response.json();
+        
+        renderCVChart('cvChart7d12h', data.cv_7d_12h, cvChart7d12h);
+        renderCVChart('cvChart30d48h', data.cv_30d_48h, cvChart30d48h);
+        renderCVChart('cvChart30d5d', data.cv_30d_5d, cvChart30d5d);
+    } catch (err) {
+        console.error('Failed to load CV charts:', err);
+    }
+}
+
+/**
+ * Render a single CV chart
+ */
+function renderCVChart(canvasId, data, chartInstance) {
+    const ctx = document.getElementById(canvasId).getContext('2d');
+    
+    if (chartInstance) {
+        chartInstance.destroy();
+    }
+    
+    const maxCV = Math.max(...data.map(d => d.cv || 0), 100);
+    
+    const chart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: data.map(d => d.label),
+            datasets: [{
+                label: 'CV (%)',
+                data: data.map(d => d.cv),
+                borderColor: '#667eea',
+                backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                tension: 0.1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            scales: {
+                x: {
+                    ticks: {
+                        display: false
+                    },
+                    grid: {
+                        display: false
+                    }
+                },
+                y: {
+                    beginAtZero: true,
+                    max: Math.max(maxCV, 40),
+                    title: {
+                        display: true,
+                        text: 'CV (%)'
+                    }
+                }
+            },
+            plugins: {
+                legend: {
+                    display: false
+                },
+                annotation: {
+                    annotations: {
+                        greenBand: {
+                            type: 'box',
+                            yMin: 0,
+                            yMax: 20,
+                            backgroundColor: 'rgba(0, 255, 0, 0.5)',
+                            borderWidth: 0
+                        },
+                        yellowBand: {
+                            type: 'box',
+                            yMin: 20,
+                            yMax: 30,
+                            backgroundColor: 'rgba(255, 255, 0, 0.5)',
+                            borderWidth: 0
+                        },
+                        redBand: {
+                            type: 'box',
+                            yMin: 30,
+                            yMax: Math.max(maxCV, 40),
+                            backgroundColor: 'rgba(255, 0, 0, 0.5)',
+                            borderWidth: 0
+                        }
+                    }
+                }
+            }
+        }
+    });
+    
+    if (canvasId === 'cvChart7d12h') {
+        cvChart7d12h = chart;
+    } else if (canvasId === 'cvChart30d48h') {
+        cvChart30d48h = chart;
+    } else if (canvasId === 'cvChart30d5d') {
+        cvChart30d5d = chart;
+    }
+}
+
+/**
+ * Load and render CV charts
+ */
+async function loadCVCharts() {
+    const endDate = document.getElementById('cv-end-date').value;
+    
+    try {
+        const response = await fetch(`${API_BASE}/dashboard/cv-charts?end_date=${endDate}`);
+        const data = await response.json();
+        
+        renderCVChart('cvChart7d12h', data.cv_7d_12h, cvChart7d12h);
+        renderCVChart('cvChart30d48h', data.cv_30d_48h, cvChart30d48h);
+        renderCVChart('cvChart30d5d', data.cv_30d_5d, cvChart30d5d);
+    } catch (err) {
+        console.error('Failed to load CV charts:', err);
     }
 }

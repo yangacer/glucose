@@ -71,6 +71,132 @@ def calculate_time_weighted_mean(data):
     return total_area / total_time if total_time > 0 else None
 
 
+def calculate_standard_deviation(data):
+    """Calculate standard deviation of glucose values."""
+    if len(data) < 2:
+        return None
+    
+    values = [v for _, v in data]
+    mean = sum(values) / len(values)
+    variance = sum((v - mean) ** 2 for v in values) / len(values)
+    return variance ** 0.5
+
+
+def calculate_cv(data):
+    """Calculate coefficient of variation (CV) as percentage."""
+    if len(data) < 2:
+        return None
+    
+    time_weighted_mean = calculate_time_weighted_mean(data)
+    if time_weighted_mean is None or time_weighted_mean == 0:
+        return None
+    
+    std_dev = calculate_standard_deviation(data)
+    if std_dev is None:
+        return None
+    
+    return (std_dev / time_weighted_mean) * 100
+
+
+def generate_cv_windows(end_date, days, window_hours):
+    """Generate time windows for CV calculation.
+    
+    Args:
+        end_date: End date (datetime.date)
+        days: Number of days to look back
+        window_hours: Window size in hours (12, 48, or 120)
+    
+    Returns:
+        List of (window_label, window_start, window_end) tuples
+    """
+    windows = []
+    anchor_time = datetime.combine(end_date, datetime.min.time()) + timedelta(hours=5)
+    
+    current_window_end = anchor_time
+    
+    while True:
+        window_start = current_window_end - timedelta(hours=window_hours)
+        
+        days_back = (anchor_time - window_start).total_seconds() / 86400
+        if days_back > days:
+            break
+        
+        if window_hours == 12:
+            if window_start.hour == 5:
+                label = f"{window_start.strftime('%Y-%m-%d')} Day"
+            else:
+                label = f"{window_start.strftime('%Y-%m-%d')} Night"
+        elif window_hours == 48:
+            label = f"{window_start.strftime('%Y-%m-%d')} to {current_window_end.strftime('%Y-%m-%d')}"
+        else:
+            label = f"{window_start.strftime('%Y-%m-%d')} to {current_window_end.strftime('%Y-%m-%d')}"
+        
+        windows.append((
+            label,
+            window_start.strftime('%Y-%m-%d %H:%M:%S'),
+            current_window_end.strftime('%Y-%m-%d %H:%M:%S')
+        ))
+        
+        current_window_end = window_start
+    
+    return list(reversed(windows))
+
+
+def calculate_cv_data(glucose_rows, windows):
+    """Calculate CV for each time window.
+    
+    Args:
+        glucose_rows: List of (timestamp_str, level) tuples
+        windows: List of (label, start, end) tuples
+    
+    Returns:
+        List of {'label': str, 'cv': float} dicts
+    """
+    result = []
+    
+    for label, window_start, window_end in windows:
+        window_data = []
+        for timestamp_str, level in glucose_rows:
+            if window_start <= timestamp_str <= window_end:
+                dt = datetime.strptime(timestamp_str, '%Y-%m-%d %H:%M:%S')
+                window_data.append((dt, level))
+        
+        cv = calculate_cv(window_data)
+        result.append({
+            'label': label,
+            'cv': round(cv, 2) if cv is not None else None
+        })
+    
+    return result
+
+
+def calculate_standard_deviation(data):
+    """Calculate standard deviation of glucose values."""
+    if len(data) < 2:
+        return None
+    
+    values = [v for _, v in data]
+    mean = sum(values) / len(values)
+    variance = sum((v - mean) ** 2 for v in values) / len(values)
+    return variance ** 0.5
+
+
+def calculate_cv(data):
+    """Calculate coefficient of variation (CV) as percentage."""
+    if len(data) < 2:
+        return None
+    
+    time_weighted_mean = calculate_time_weighted_mean(data)
+    if time_weighted_mean is None or time_weighted_mean == 0:
+        return None
+    
+    std_dev = calculate_standard_deviation(data)
+    if std_dev is None:
+        return None
+    
+    return (std_dev / time_weighted_mean) * 100
+
+
 def calculate_weekly_mean(rows):
     """Group glucose data by week and calculate time-weighted mean."""
     if len(rows) < 2:
@@ -131,6 +257,105 @@ def calculate_weekly_mean_both(glucose_rows, insulin_rows):
             'week': week_key,
             'glucose_mean': round(glucose_mean, 2) if glucose_mean is not None else None,
             'insulin_mean': round(insulin_mean, 2) if insulin_mean is not None else None
+        })
+    
+    return result
+
+
+def calculate_standard_deviation(data):
+    """Calculate standard deviation of glucose values."""
+    if len(data) < 2:
+        return None
+    
+    values = [v for _, v in data]
+    mean = sum(values) / len(values)
+    variance = sum((v - mean) ** 2 for v in values) / len(values)
+    return variance ** 0.5
+
+
+def calculate_cv(data):
+    """Calculate coefficient of variation (CV) as percentage."""
+    if len(data) < 2:
+        return None
+    
+    time_weighted_mean = calculate_time_weighted_mean(data)
+    if time_weighted_mean is None or time_weighted_mean == 0:
+        return None
+    
+    std_dev = calculate_standard_deviation(data)
+    if std_dev is None:
+        return None
+    
+    return (std_dev / time_weighted_mean) * 100
+
+
+def generate_cv_windows(end_date, days, window_hours):
+    """Generate time windows for CV calculation.
+    
+    Args:
+        end_date: End date (datetime.date)
+        days: Number of days to look back
+        window_hours: Window size in hours (12, 48, or 120)
+    
+    Returns:
+        List of (window_label, window_start, window_end) tuples
+    """
+    windows = []
+    anchor_time = datetime.combine(end_date, datetime.min.time()) + timedelta(hours=5)
+    
+    current_window_end = anchor_time
+    
+    while True:
+        window_start = current_window_end - timedelta(hours=window_hours)
+        
+        days_back = (anchor_time - window_start).total_seconds() / 86400
+        if days_back > days:
+            break
+        
+        if window_hours == 12:
+            if window_start.hour == 5:
+                label = f"{window_start.strftime('%Y-%m-%d')} Day"
+            else:
+                label = f"{window_start.strftime('%Y-%m-%d')} Night"
+        elif window_hours == 48:
+            label = f"{window_start.strftime('%Y-%m-%d')} to {current_window_end.strftime('%Y-%m-%d')}"
+        else:
+            label = f"{window_start.strftime('%Y-%m-%d')} to {current_window_end.strftime('%Y-%m-%d')}"
+        
+        windows.append((
+            label,
+            window_start.strftime('%Y-%m-%d %H:%M:%S'),
+            current_window_end.strftime('%Y-%m-%d %H:%M:%S')
+        ))
+        
+        current_window_end = window_start
+    
+    return list(reversed(windows))
+
+
+def calculate_cv_data(glucose_rows, windows):
+    """Calculate CV for each time window.
+    
+    Args:
+        glucose_rows: List of (timestamp_str, level) tuples
+        windows: List of (label, start, end) tuples
+    
+    Returns:
+        List of {'label': str, 'cv': float} dicts
+    """
+    result = []
+    
+    for label, window_start, window_end in windows:
+        window_data = []
+        for timestamp_str, level in glucose_rows:
+            if window_start <= timestamp_str <= window_end:
+                dt = datetime.strptime(timestamp_str, '%Y-%m-%d %H:%M:%S')
+                window_data.append((dt, level))
+        
+        cv = calculate_cv(window_data)
+        result.append({
+            'label': label,
+            'cv': round(cv, 2) if cv is not None else None
         })
     
     return result
@@ -451,6 +676,7 @@ class GlucoseHandler(http.server.SimpleHTTPRequestHandler):
             '/api/event': lambda: self.handle_get_event_list(query_params),
             '/api/dashboard/glucose-chart': lambda: self.handle_get_glucose_chart(query_params),
             '/api/dashboard/summary': lambda: self.handle_get_summary(query_params),
+            '/api/dashboard/cv-charts': lambda: self.handle_get_cv_charts(query_params),
         }
         
         if path in route_handlers:
@@ -726,6 +952,38 @@ class GlucoseHandler(http.server.SimpleHTTPRequestHandler):
         
         conn.close()
         self._send_json(summary_data)
+    
+    def handle_get_cv_charts(self, query_params):
+        today = date.today()
+        end_date_str = query_params.get('end_date', [today.strftime('%Y-%m-%d')])[0]
+        end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
+        
+        # Calculate date ranges
+        start_7_days = (end_date - timedelta(days=7)).strftime('%Y-%m-%d')
+        start_30_days = (end_date - timedelta(days=30)).strftime('%Y-%m-%d')
+        end_date_with_time = end_date_str + ' 23:59:59'
+        
+        # Query glucose data for 30 days (covers all chart needs)
+        glucose_query = '''SELECT timestamp, level FROM glucose 
+                          WHERE timestamp BETWEEN ? AND ? 
+                          ORDER BY timestamp'''
+        glucose_rows = execute_query(glucose_query, (start_30_days, end_date_with_time))
+        
+        # Generate windows for each chart
+        windows_7d_12h = generate_cv_windows(end_date, 7, 12)
+        windows_30d_48h = generate_cv_windows(end_date, 30, 48)
+        windows_30d_5d = generate_cv_windows(end_date, 30, 120)
+        
+        # Calculate CV data for each chart
+        cv_7d_12h = calculate_cv_data(glucose_rows, windows_7d_12h)
+        cv_30d_48h = calculate_cv_data(glucose_rows, windows_30d_48h)
+        cv_30d_5d = calculate_cv_data(glucose_rows, windows_30d_5d)
+        
+        self._send_json({
+            'cv_7d_12h': cv_7d_12h,
+            'cv_30d_48h': cv_30d_48h,
+            'cv_30d_5d': cv_30d_5d
+        })
 
 
 # ============================================================================
