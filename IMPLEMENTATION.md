@@ -4,6 +4,8 @@
 
 This document describes the technical implementation details for developers. For feature specifications and UI/UX design, see `DESIGN.md`.
 
+**Target Species:** Cats - all threshold values are calibrated for feline glucose metabolism.
+
 ---
 
 # Architecture
@@ -347,6 +349,21 @@ MTLS_ENABLED=false PORT=8000 python3 server.py
 - Bands provide context without obscuring data
 - Chart.js `drawTime: 'beforeDatasetsDraw'` enables this
 - Consistent alpha (0.3) for subtle but visible bands
+
+## Feline-Specific Thresholds
+**Why different from human values?**
+- Cats have naturally higher glucose baseline (70-150 mg/dL vs human 70-100 mg/dL)
+- Greater glucose variability is normal in cats
+- Diabetic cats tolerate wider ranges (100-250 mg/dL target)
+- Risk metric formulas adapted for feline physiology
+
+**Threshold Values:**
+- CV: 0-25% (green), 25-35% (yellow), >35% (red)
+- LBGI: 0-3.5 (green), 3.5-7 (yellow), >7 (red)
+- HBGI: 0-6 (green), 6-12 (yellow), >12 (red)
+- ADRR: 0-25 (green), 25-50 (yellow), >50 (red)
+
+**Note:** These values are adjusted from human clinical thresholds based on feline glucose metabolism research and veterinary guidelines.
 
 ---
 

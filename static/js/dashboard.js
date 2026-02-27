@@ -336,23 +336,23 @@ function renderCVChart(canvasId, data, chartInstance) {
                         greenBand: {
                             type: 'box',
                             yMin: 0,
-                            yMax: 20,
+                            yMax: 25,
                             backgroundColor: 'rgba(0, 255, 0, 0.3)',
                             borderWidth: 0,
                             drawTime: 'beforeDatasetsDraw'
                         },
                         yellowBand: {
                             type: 'box',
-                            yMin: 20,
-                            yMax: 30,
+                            yMin: 25,
+                            yMax: 35,
                             backgroundColor: 'rgba(255, 255, 0, 0.3)',
                             borderWidth: 0,
                             drawTime: 'beforeDatasetsDraw'
                         },
                         redBand: {
                             type: 'box',
-                            yMin: 30,
-                            yMax: Math.max(maxCV, 40),
+                            yMin: 35,
+                            yMax: Math.max(maxCV, 45),
                             backgroundColor: 'rgba(255, 0, 0, 0.3)',
                             borderWidth: 0,
                             drawTime: 'beforeDatasetsDraw'
@@ -400,29 +400,29 @@ async function loadRiskMetrics() {
         const response = await fetch(`${API_BASE}/dashboard/risk-metrics?end_date=${endDate}`);
         const data = await response.json();
         
-        // Render LBGI charts
+        // Render LBGI charts (adjusted for cats)
         renderRiskChart('lbgiChart7d12h', data.lbgi_7d_12h, lbgiChart7d12h, 'LBGI', 
-                       [2.5, 5], ['rgba(0, 255, 0, 0.3)', 'rgba(255, 255, 0, 0.3)', 'rgba(255, 0, 0, 0.3)']);
+                       [3.5, 7], ['rgba(0, 255, 0, 0.3)', 'rgba(255, 255, 0, 0.3)', 'rgba(255, 0, 0, 0.3)']);
         renderRiskChart('lbgiChart30d48h', data.lbgi_30d_48h, lbgiChart30d48h, 'LBGI',
-                       [2.5, 5], ['rgba(0, 255, 0, 0.3)', 'rgba(255, 255, 0, 0.3)', 'rgba(255, 0, 0, 0.3)']);
+                       [3.5, 7], ['rgba(0, 255, 0, 0.3)', 'rgba(255, 255, 0, 0.3)', 'rgba(255, 0, 0, 0.3)']);
         renderRiskChart('lbgiChart30d5d', data.lbgi_30d_5d, lbgiChart30d5d, 'LBGI',
-                       [2.5, 5], ['rgba(0, 255, 0, 0.3)', 'rgba(255, 255, 0, 0.3)', 'rgba(255, 0, 0, 0.3)']);
+                       [3.5, 7], ['rgba(0, 255, 0, 0.3)', 'rgba(255, 255, 0, 0.3)', 'rgba(255, 0, 0, 0.3)']);
         
-        // Render HBGI charts
+        // Render HBGI charts (adjusted for cats)
         renderRiskChart('hbgiChart7d12h', data.hbgi_7d_12h, hbgiChart7d12h, 'HBGI',
-                       [4.5, 9], ['rgba(0, 255, 0, 0.3)', 'rgba(255, 255, 0, 0.3)', 'rgba(255, 0, 0, 0.3)']);
+                       [6, 12], ['rgba(0, 255, 0, 0.3)', 'rgba(255, 255, 0, 0.3)', 'rgba(255, 0, 0, 0.3)']);
         renderRiskChart('hbgiChart30d48h', data.hbgi_30d_48h, hbgiChart30d48h, 'HBGI',
-                       [4.5, 9], ['rgba(0, 255, 0, 0.3)', 'rgba(255, 255, 0, 0.3)', 'rgba(255, 0, 0, 0.3)']);
+                       [6, 12], ['rgba(0, 255, 0, 0.3)', 'rgba(255, 255, 0, 0.3)', 'rgba(255, 0, 0, 0.3)']);
         renderRiskChart('hbgiChart30d5d', data.hbgi_30d_5d, hbgiChart30d5d, 'HBGI',
-                       [4.5, 9], ['rgba(0, 255, 0, 0.3)', 'rgba(255, 255, 0, 0.3)', 'rgba(255, 0, 0, 0.3)']);
+                       [6, 12], ['rgba(0, 255, 0, 0.3)', 'rgba(255, 255, 0, 0.3)', 'rgba(255, 0, 0, 0.3)']);
         
-        // Render ADRR charts
+        // Render ADRR charts (adjusted for cats)
         renderRiskChart('adrrChart7d12h', data.adrr_7d_12h, adrrChart7d12h, 'ADRR',
-                       [20, 40], ['rgba(0, 255, 0, 0.3)', 'rgba(255, 255, 0, 0.3)', 'rgba(255, 0, 0, 0.3)']);
+                       [25, 50], ['rgba(0, 255, 0, 0.3)', 'rgba(255, 255, 0, 0.3)', 'rgba(255, 0, 0, 0.3)']);
         renderRiskChart('adrrChart30d48h', data.adrr_30d_48h, adrrChart30d48h, 'ADRR',
-                       [20, 40], ['rgba(0, 255, 0, 0.3)', 'rgba(255, 255, 0, 0.3)', 'rgba(255, 0, 0, 0.3)']);
+                       [25, 50], ['rgba(0, 255, 0, 0.3)', 'rgba(255, 255, 0, 0.3)', 'rgba(255, 0, 0, 0.3)']);
         renderRiskChart('adrrChart30d5d', data.adrr_30d_5d, adrrChart30d5d, 'ADRR',
-                       [20, 40], ['rgba(0, 255, 0, 0.3)', 'rgba(255, 255, 0, 0.3)', 'rgba(255, 0, 0, 0.3)']);
+                       [25, 50], ['rgba(0, 255, 0, 0.3)', 'rgba(255, 255, 0, 0.3)', 'rgba(255, 0, 0, 0.3)']);
     } catch (err) {
         console.error('Failed to load risk metrics:', err);
     }

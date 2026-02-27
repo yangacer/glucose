@@ -2,9 +2,11 @@
 
 ## Overview
 
-A personal health monitoring application for tracking glucose levels, insulin doses, nutrition intake, and related health metrics.
+A personal health monitoring application for tracking feline glucose levels, insulin doses, nutrition intake, and related health metrics.
 
-**Target Users:** Individuals managing diabetes or monitoring blood glucose levels
+**Target Users:** Cat owners managing feline diabetes or monitoring blood glucose levels
+
+**Note:** Threshold values are calibrated for cats. Normal feline glucose range is 70-150 mg/dL, with diabetic cats targeting 100-250 mg/dL.
 
 ---
 
@@ -225,9 +227,9 @@ CV = (Standard Deviation / Time-Weighted Mean) × 100
 - ~6 data points
 
 **Threshold Bands:**
-- Green (0-20%): Good glucose control
-- Yellow (20-30%): Moderate variability
-- Red (>30%): High variability, needs attention
+- Green (0-25%): Good glucose control for cats
+- Yellow (25-35%): Moderate variability, acceptable range
+- Red (>35%): High variability, needs attention
 
 **Features:**
 - All windows anchored at 5:00 AM
@@ -239,31 +241,31 @@ CV = (Standard Deviation / Time-Weighted Mean) × 100
 
 ### Risk Metrics Charts
 
-**Purpose:** Quantify hypoglycemia and hyperglycemia risk using clinical metrics
+**Purpose:** Quantify hypoglycemia and hyperglycemia risk using clinical metrics (adapted for feline physiology)
 
 **Three Metric Types:**
 
 **LBGI (Low Blood Glucose Index)**
 - Measures hypoglycemia risk
-- Threshold bands:
-  - Green (0-2.5): Low risk
-  - Yellow (2.5-5): Moderate risk
-  - Red (>5): High risk
+- Threshold bands (adjusted for cats):
+  - Green (0-3.5): Low risk
+  - Yellow (3.5-7): Moderate risk
+  - Red (>7): High risk
 
 **HBGI (High Blood Glucose Index)**
 - Measures hyperglycemia risk
-- Threshold bands:
-  - Green (0-4.5): Low risk
-  - Yellow (4.5-9): Moderate risk
-  - Red (>9): High risk
+- Threshold bands (adjusted for cats):
+  - Green (0-6): Low risk
+  - Yellow (6-12): Moderate risk
+  - Red (>12): High risk
 
 **ADRR (Average Daily Risk Range)**
 - Combines LBGI and HBGI for overall risk assessment
 - Groups data by calendar days
-- Threshold bands:
-  - Green (0-20): Low risk
-  - Yellow (20-40): Moderate risk
-  - Red (>40): High risk
+- Threshold bands (adjusted for cats):
+  - Green (0-25): Low risk
+  - Yellow (25-50): Moderate risk
+  - Red (>50): High risk
 
 **Chart Organization:**
 - Each metric has three time window charts (7d/12h, 30d/48h, 30d/5d)
@@ -406,6 +408,13 @@ Click outside overlay to dismiss.
 - Edit and delete capabilities
 - Date range filtering for historical review
 - Confirmation before deletion
+
+### Species-Specific Calibration
+- All thresholds calibrated for feline glucose metabolism
+- CV bands account for naturally higher feline variability
+- Risk metrics adjusted for cats' tolerance to higher glucose
+- Normal range: 70-150 mg/dL (vs human 70-100 mg/dL)
+- Diabetic target: 100-250 mg/dL (vs human 80-130 mg/dL)
 
 ---
 
