@@ -54,6 +54,47 @@
                 <canvas id="cvChart30d5d"></canvas>
             </section>
 
+            <section class="chart-section">
+                <h2>Risk Metrics</h2>
+                <div class="date-filter">
+                    <label>End Date: <input type="date" id="risk-end-date"></label>
+                    <button onclick="loadRiskMetrics()">Update Charts</button>
+                </div>
+                
+                <h3>Low Blood Glucose Index (LBGI)</h3>
+                
+                <h4>Last 7 Days per 12-hour LBGI</h4>
+                <canvas id="lbgiChart7d12h"></canvas>
+                
+                <h4>Last 30 Days per 48-hour LBGI</h4>
+                <canvas id="lbgiChart30d48h"></canvas>
+                
+                <h4>Last 30 Days per 5-day LBGI</h4>
+                <canvas id="lbgiChart30d5d"></canvas>
+                
+                <h3>High Blood Glucose Index (HBGI)</h3>
+                
+                <h4>Last 7 Days per 12-hour HBGI</h4>
+                <canvas id="hbgiChart7d12h"></canvas>
+                
+                <h4>Last 30 Days per 48-hour HBGI</h4>
+                <canvas id="hbgiChart30d48h"></canvas>
+                
+                <h4>Last 30 Days per 5-day HBGI</h4>
+                <canvas id="hbgiChart30d5d"></canvas>
+                
+                <h3>Average Daily Risk Range (ADRR)</h3>
+                
+                <h4>Last 7 Days per 12-hour ADRR</h4>
+                <canvas id="adrrChart7d12h"></canvas>
+                
+                <h4>Last 30 Days per 48-hour ADRR</h4>
+                <canvas id="adrrChart30d48h"></canvas>
+                
+                <h4>Last 30 Days per 5-day ADRR</h4>
+                <canvas id="adrrChart30d5d"></canvas>
+            </section>
+
             <section class="summary-section">
                 <h2>Summary Timesheet</h2>
                 <div class="date-filter">
@@ -360,14 +401,14 @@
     </div>
 
     <!-- JavaScript modules -->
-    <script src="js/config.js?v=0.3.0"></script>
-    <script src="js/utils.js?v=0.3.0"></script>
-    <script src="js/tabs.js?v=0.3.0"></script>
-    <script src="js/dashboard.js?v=0.3.0"></script>
-    <script src="js/data-loader.js?v=0.3.0"></script>
-    <script src="js/dynamic-items.js?v=0.3.0"></script>
-    <script src="js/forms.js?v=0.3.0"></script>
-    <script src="js/audit.js?v=0.3.0"></script>
-    <script src="js/main.js?v=0.3.0"></script>
+    <script src="js/config.js?v=0.4.0"></script>
+    <script src="js/utils.js?v=0.4.0"></script>
+    <script src="js/tabs.js?v=0.4.0"></script>
+    <script src="js/dashboard.js?v=0.4.0"></script>
+    <script src="js/data-loader.js?v=0.4.0"></script>
+    <script src="js/dynamic-items.js?v=0.4.0"></script>
+    <script src="js/forms.js?v=0.4.0"></script>
+    <script src="js/audit.js?v=0.4.0"></script>
+    <script src="js/main.js?v=0.4.0"></script>
 </body>
 </html>

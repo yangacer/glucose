@@ -170,6 +170,162 @@ def calculate_cv_data(glucose_rows, windows):
     return result
 
 
+def calculate_risk_function(glucose_mg_dl):
+    """Calculate risk function f(G) for LBGI/HBGI.
+    
+    Args:
+        glucose_mg_dl: Glucose level in mg/dL
+    
+    Returns:
+        Risk function value
+    """
+    import math
+    return 1.509 * (math.log(glucose_mg_dl) ** 1.084 - 5.381)
+
+
+def calculate_lbgi(data):
+    """Calculate Low Blood Glucose Index (LBGI).
+    
+    Args:
+        data: List of (timestamp, glucose_level) tuples
+    
+    Returns:
+        LBGI value or None if insufficient data
+    """
+    if len(data) < 1:
+        return None
+    
+    low_risks = []
+    for _, glucose in data:
+        f_g = calculate_risk_function(glucose)
+        if f_g < 0:
+            rl = 10 * (f_g ** 2)
+            low_risks.append(rl)
+        else:
+            low_risks.append(0)
+    
+    return sum(low_risks) / len(low_risks) if low_risks else None
+
+
+def calculate_hbgi(data):
+    """Calculate High Blood Glucose Index (HBGI).
+    
+    Args:
+        data: List of (timestamp, glucose_level) tuples
+    
+    Returns:
+        HBGI value or None if insufficient data
+    """
+    if len(data) < 1:
+        return None
+    
+    high_risks = []
+    for _, glucose in data:
+        f_g = calculate_risk_function(glucose)
+        if f_g > 0:
+            rh = 10 * (f_g ** 2)
+            high_risks.append(rh)
+        else:
+            high_risks.append(0)
+    
+    return sum(high_risks) / len(high_risks) if high_risks else None
+
+
+def calculate_adrr(glucose_rows, windows):
+    """Calculate Average Daily Risk Range (ADRR).
+    
+    Groups data by calendar days, calculates LBGI + HBGI for each day,
+    then averages the daily risk ranges.
+    
+    Args:
+        glucose_rows: List of (timestamp_str, level) tuples
+        windows: List of (label, start, end) tuples
+    
+    Returns:
+        ADRR value or None if insufficient data
+    """
+    if not glucose_rows:
+        return None
+    
+    # Group by calendar date
+    daily_data = defaultdict(list)
+    for timestamp_str, level in glucose_rows:
+        dt = datetime.strptime(timestamp_str, '%Y-%m-%d %H:%M:%S')
+        date_key = dt.date()
+        daily_data[date_key].append((dt, level))
+    
+    # Calculate daily risk range for each day
+    daily_rr = []
+    for date_key in sorted(daily_data.keys()):
+        day_data = daily_data[date_key]
+        if len(day_data) >= 2:
+            lbgi = calculate_lbgi(day_data)
+            hbgi = calculate_hbgi(day_data)
+            if lbgi is not None and hbgi is not None:
+                daily_rr.append(lbgi + hbgi)
+    
+    return sum(daily_rr) / len(daily_rr) if daily_rr else None
+
+
+def calculate_risk_metric_data(glucose_rows, windows, metric_type):
+    """Calculate LBGI or HBGI for each time window.
+    
+    Args:
+        glucose_rows: List of (timestamp_str, level) tuples
+        windows: List of (label, start, end) tuples
+        metric_type: 'lbgi' or 'hbgi'
+    
+    Returns:
+        List of {'label': str, 'value': float} dicts
+    """
+    result = []
+    calc_func = calculate_lbgi if metric_type == 'lbgi' else calculate_hbgi
+    
+    for label, window_start, window_end in windows:
+        window_data = []
+        for timestamp_str, level in glucose_rows:
+            if window_start <= timestamp_str <= window_end:
+                dt = datetime.strptime(timestamp_str, '%Y-%m-%d %H:%M:%S')
+                window_data.append((dt, level))
+        
+        value = calc_func(window_data)
+        result.append({
+            'label': label,
+            'value': round(value, 2) if value is not None else None
+        })
+    
+    return result
+
+
+def calculate_adrr_data(glucose_rows, windows):
+    """Calculate ADRR for each time window.
+    
+    Args:
+        glucose_rows: List of (timestamp_str, level) tuples
+        windows: List of (label, start, end) tuples
+    
+    Returns:
+        List of {'label': str, 'value': float} dicts
+    """
+    result = []
+    
+    for label, window_start, window_end in windows:
+        # Filter glucose data for this window
+        window_rows = [
+            (ts, level) for ts, level in glucose_rows
+            if window_start <= ts <= window_end
+        ]
+        
+        # Calculate ADRR for this window (treats window as full period)
+        adrr = calculate_adrr(window_rows, [(label, window_start, window_end)])
+        result.append({
+            'label': label,
+            'value': round(adrr, 2) if adrr is not None else None
+        })
+    
+    return result
+
+
 def calculate_standard_deviation(data):
     """Calculate standard deviation of glucose values."""
     if len(data) < 2:
@@ -677,6 +833,7 @@ class GlucoseHandler(http.server.SimpleHTTPRequestHandler):
             '/api/dashboard/glucose-chart': lambda: self.handle_get_glucose_chart(query_params),
             '/api/dashboard/summary': lambda: self.handle_get_summary(query_params),
             '/api/dashboard/cv-charts': lambda: self.handle_get_cv_charts(query_params),
+            '/api/dashboard/risk-metrics': lambda: self.handle_get_risk_metrics(query_params),
         }
         
         if path in route_handlers:
@@ -983,6 +1140,52 @@ class GlucoseHandler(http.server.SimpleHTTPRequestHandler):
             'cv_7d_12h': cv_7d_12h,
             'cv_30d_48h': cv_30d_48h,
             'cv_30d_5d': cv_30d_5d
+        })
+    
+    def handle_get_risk_metrics(self, query_params):
+        today = date.today()
+        end_date_str = query_params.get('end_date', [today.strftime('%Y-%m-%d')])[0]
+        end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
+        
+        # Calculate date ranges
+        start_7_days = (end_date - timedelta(days=7)).strftime('%Y-%m-%d')
+        start_30_days = (end_date - timedelta(days=30)).strftime('%Y-%m-%d')
+        end_date_with_time = end_date_str + ' 23:59:59'
+        
+        # Query glucose data for 30 days (covers all chart needs)
+        glucose_query = '''SELECT timestamp, level FROM glucose 
+                          WHERE timestamp BETWEEN ? AND ? 
+                          ORDER BY timestamp'''
+        glucose_rows = execute_query(glucose_query, (start_30_days, end_date_with_time))
+        
+        # Generate windows for each chart
+        windows_7d_12h = generate_cv_windows(end_date, 7, 12)
+        windows_30d_48h = generate_cv_windows(end_date, 30, 48)
+        windows_30d_5d = generate_cv_windows(end_date, 30, 120)
+        
+        # Calculate risk metrics for each chart
+        lbgi_7d_12h = calculate_risk_metric_data(glucose_rows, windows_7d_12h, 'lbgi')
+        lbgi_30d_48h = calculate_risk_metric_data(glucose_rows, windows_30d_48h, 'lbgi')
+        lbgi_30d_5d = calculate_risk_metric_data(glucose_rows, windows_30d_5d, 'lbgi')
+        
+        hbgi_7d_12h = calculate_risk_metric_data(glucose_rows, windows_7d_12h, 'hbgi')
+        hbgi_30d_48h = calculate_risk_metric_data(glucose_rows, windows_30d_48h, 'hbgi')
+        hbgi_30d_5d = calculate_risk_metric_data(glucose_rows, windows_30d_5d, 'hbgi')
+        
+        adrr_7d_12h = calculate_adrr_data(glucose_rows, windows_7d_12h)
+        adrr_30d_48h = calculate_adrr_data(glucose_rows, windows_30d_48h)
+        adrr_30d_5d = calculate_adrr_data(glucose_rows, windows_30d_5d)
+        
+        self._send_json({
+            'lbgi_7d_12h': lbgi_7d_12h,
+            'lbgi_30d_48h': lbgi_30d_48h,
+            'lbgi_30d_5d': lbgi_30d_5d,
+            'hbgi_7d_12h': hbgi_7d_12h,
+            'hbgi_30d_48h': hbgi_30d_48h,
+            'hbgi_30d_5d': hbgi_30d_5d,
+            'adrr_7d_12h': adrr_7d_12h,
+            'adrr_30d_48h': adrr_30d_48h,
+            'adrr_30d_5d': adrr_30d_5d
         })
 
 

@@ -560,6 +560,70 @@ class TestGlucoseAPI(unittest.TestCase):
         self.assertIsInstance(data['cv_7d_12h'], list)
         self.assertIsInstance(data['cv_30d_48h'], list)
         self.assertIsInstance(data['cv_30d_5d'], list)
+    
+    def test_26_risk_metrics_calculation(self):
+        """Test LBGI, HBGI, ADRR calculation functions"""
+        from server import calculate_lbgi, calculate_hbgi, calculate_adrr
+        from datetime import datetime
+        
+        test_data = [
+            (datetime(2026, 2, 20, 8, 0), 100),
+            (datetime(2026, 2, 20, 9, 0), 110),
+            (datetime(2026, 2, 20, 10, 0), 105),
+            (datetime(2026, 2, 20, 11, 0), 95),
+        ]
+        
+        lbgi = calculate_lbgi(test_data)
+        self.assertIsNotNone(lbgi)
+        self.assertGreaterEqual(lbgi, 0)
+        self.assertIsInstance(lbgi, float)
+        
+        hbgi = calculate_hbgi(test_data)
+        self.assertIsNotNone(hbgi)
+        self.assertGreaterEqual(hbgi, 0)
+        self.assertIsInstance(hbgi, float)
+        
+        test_rows = [
+            ('2026-02-20 08:00:00', 100),
+            ('2026-02-20 09:00:00', 110),
+            ('2026-02-20 10:00:00', 105),
+            ('2026-02-20 11:00:00', 95),
+        ]
+        windows = [('test', '2026-02-20 00:00:00', '2026-02-20 23:59:59')]
+        
+        adrr = calculate_adrr(test_rows, windows)
+        self.assertIsNotNone(adrr)
+        self.assertGreaterEqual(adrr, 0)
+        self.assertIsInstance(adrr, float)
+    
+    def test_27_risk_metrics_api(self):
+        """Test risk metrics API endpoint"""
+        status, data = self.make_request('GET', '/api/dashboard/risk-metrics?end_date=2026-02-26')
+        self.assertEqual(status, 200)
+        
+        # Check all LBGI charts
+        self.assertIn('lbgi_7d_12h', data)
+        self.assertIn('lbgi_30d_48h', data)
+        self.assertIn('lbgi_30d_5d', data)
+        
+        # Check all HBGI charts
+        self.assertIn('hbgi_7d_12h', data)
+        self.assertIn('hbgi_30d_48h', data)
+        self.assertIn('hbgi_30d_5d', data)
+        
+        # Check all ADRR charts
+        self.assertIn('adrr_7d_12h', data)
+        self.assertIn('adrr_30d_48h', data)
+        self.assertIn('adrr_30d_5d', data)
+        
+        # Verify structure
+        for window in data['lbgi_7d_12h']:
+            self.assertIn('label', window)
+            self.assertIn('value', window)
+        
+        self.assertIsInstance(data['lbgi_7d_12h'], list)
+        self.assertIsInstance(data['hbgi_7d_12h'], list)
+        self.assertIsInstance(data['adrr_7d_12h'], list)
 
 
 if __name__ == '__main__':

@@ -4,6 +4,15 @@ let glucoseChart = null;
 let cvChart7d12h = null;
 let cvChart30d48h = null;
 let cvChart30d5d = null;
+let lbgiChart7d12h = null;
+let lbgiChart30d48h = null;
+let lbgiChart30d5d = null;
+let hbgiChart7d12h = null;
+let hbgiChart30d48h = null;
+let hbgiChart30d5d = null;
+let adrrChart7d12h = null;
+let adrrChart30d48h = null;
+let adrrChart30d5d = null;
 
 /**
  * Get color styling for glucose level
@@ -38,6 +47,7 @@ async function loadDashboard() {
     loadSummary();
     loadNutritionList();
     loadCVCharts();
+    loadRiskMetrics();
 }
 
 /**
@@ -377,5 +387,146 @@ async function loadCVCharts() {
         renderCVChart('cvChart30d5d', data.cv_30d_5d, cvChart30d5d);
     } catch (err) {
         console.error('Failed to load CV charts:', err);
+    }
+}
+
+/**
+ * Load and render risk metrics charts
+ */
+async function loadRiskMetrics() {
+    const endDate = document.getElementById('risk-end-date').value;
+    
+    try {
+        const response = await fetch(`${API_BASE}/dashboard/risk-metrics?end_date=${endDate}`);
+        const data = await response.json();
+        
+        // Render LBGI charts
+        renderRiskChart('lbgiChart7d12h', data.lbgi_7d_12h, lbgiChart7d12h, 'LBGI', 
+                       [2.5, 5], ['rgba(0, 255, 0, 0.3)', 'rgba(255, 255, 0, 0.3)', 'rgba(255, 0, 0, 0.3)']);
+        renderRiskChart('lbgiChart30d48h', data.lbgi_30d_48h, lbgiChart30d48h, 'LBGI',
+                       [2.5, 5], ['rgba(0, 255, 0, 0.3)', 'rgba(255, 255, 0, 0.3)', 'rgba(255, 0, 0, 0.3)']);
+        renderRiskChart('lbgiChart30d5d', data.lbgi_30d_5d, lbgiChart30d5d, 'LBGI',
+                       [2.5, 5], ['rgba(0, 255, 0, 0.3)', 'rgba(255, 255, 0, 0.3)', 'rgba(255, 0, 0, 0.3)']);
+        
+        // Render HBGI charts
+        renderRiskChart('hbgiChart7d12h', data.hbgi_7d_12h, hbgiChart7d12h, 'HBGI',
+                       [4.5, 9], ['rgba(0, 255, 0, 0.3)', 'rgba(255, 255, 0, 0.3)', 'rgba(255, 0, 0, 0.3)']);
+        renderRiskChart('hbgiChart30d48h', data.hbgi_30d_48h, hbgiChart30d48h, 'HBGI',
+                       [4.5, 9], ['rgba(0, 255, 0, 0.3)', 'rgba(255, 255, 0, 0.3)', 'rgba(255, 0, 0, 0.3)']);
+        renderRiskChart('hbgiChart30d5d', data.hbgi_30d_5d, hbgiChart30d5d, 'HBGI',
+                       [4.5, 9], ['rgba(0, 255, 0, 0.3)', 'rgba(255, 255, 0, 0.3)', 'rgba(255, 0, 0, 0.3)']);
+        
+        // Render ADRR charts
+        renderRiskChart('adrrChart7d12h', data.adrr_7d_12h, adrrChart7d12h, 'ADRR',
+                       [20, 40], ['rgba(0, 255, 0, 0.3)', 'rgba(255, 255, 0, 0.3)', 'rgba(255, 0, 0, 0.3)']);
+        renderRiskChart('adrrChart30d48h', data.adrr_30d_48h, adrrChart30d48h, 'ADRR',
+                       [20, 40], ['rgba(0, 255, 0, 0.3)', 'rgba(255, 255, 0, 0.3)', 'rgba(255, 0, 0, 0.3)']);
+        renderRiskChart('adrrChart30d5d', data.adrr_30d_5d, adrrChart30d5d, 'ADRR',
+                       [20, 40], ['rgba(0, 255, 0, 0.3)', 'rgba(255, 255, 0, 0.3)', 'rgba(255, 0, 0, 0.3)']);
+    } catch (err) {
+        console.error('Failed to load risk metrics:', err);
+    }
+}
+
+/**
+ * Render a single risk metric chart
+ */
+function renderRiskChart(canvasId, data, chartInstance, metricName, thresholds, colors) {
+    const ctx = document.getElementById(canvasId).getContext('2d');
+    
+    if (chartInstance) {
+        chartInstance.destroy();
+    }
+    
+    const maxValue = Math.max(...data.map(d => d.value || 0), thresholds[1] * 1.5);
+    
+    const chart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: data.map(d => d.label),
+            datasets: [{
+                label: metricName,
+                data: data.map(d => d.value),
+                borderColor: '#667eea',
+                backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                tension: 0.1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            scales: {
+                x: {
+                    ticks: {
+                        display: false
+                    },
+                    grid: {
+                        display: false
+                    }
+                },
+                y: {
+                    beginAtZero: true,
+                    max: maxValue,
+                    title: {
+                        display: true,
+                        text: metricName
+                    }
+                }
+            },
+            plugins: {
+                legend: {
+                    display: false
+                },
+                annotation: {
+                    annotations: {
+                        greenBand: {
+                            type: 'box',
+                            yMin: 0,
+                            yMax: thresholds[0],
+                            backgroundColor: colors[0],
+                            borderWidth: 0,
+                            drawTime: 'beforeDatasetsDraw'
+                        },
+                        yellowBand: {
+                            type: 'box',
+                            yMin: thresholds[0],
+                            yMax: thresholds[1],
+                            backgroundColor: colors[1],
+                            borderWidth: 0,
+                            drawTime: 'beforeDatasetsDraw'
+                        },
+                        redBand: {
+                            type: 'box',
+                            yMin: thresholds[1],
+                            yMax: maxValue,
+                            backgroundColor: colors[2],
+                            borderWidth: 0,
+                            drawTime: 'beforeDatasetsDraw'
+                        }
+                    }
+                }
+            }
+        }
+    });
+    
+    // Update global chart instance
+    if (canvasId === 'lbgiChart7d12h') {
+        lbgiChart7d12h = chart;
+    } else if (canvasId === 'lbgiChart30d48h') {
+        lbgiChart30d48h = chart;
+    } else if (canvasId === 'lbgiChart30d5d') {
+        lbgiChart30d5d = chart;
+    } else if (canvasId === 'hbgiChart7d12h') {
+        hbgiChart7d12h = chart;
+    } else if (canvasId === 'hbgiChart30d48h') {
+        hbgiChart30d48h = chart;
+    } else if (canvasId === 'hbgiChart30d5d') {
+        hbgiChart30d5d = chart;
+    } else if (canvasId === 'adrrChart7d12h') {
+        adrrChart7d12h = chart;
+    } else if (canvasId === 'adrrChart30d48h') {
+        adrrChart30d48h = chart;
+    } else if (canvasId === 'adrrChart30d5d') {
+        adrrChart30d5d = chart;
     }
 }

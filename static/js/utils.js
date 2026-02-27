@@ -85,6 +85,9 @@ function initializeDateInputs() {
     
     // CV charts date - today
     document.getElementById('cv-end-date').value = `${year}-${month}-${day}`;
+    
+    // Risk metrics date - today
+    document.getElementById('risk-end-date').value = `${year}-${month}-${day}`;
 }
 
 /**

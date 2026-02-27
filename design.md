@@ -441,7 +441,99 @@ When a row is clicked, an overlay displays the following details:
 
 ---
 
-### 4. Nutrition List
+### 4. Risk Metrics Charts
+
+**Purpose:**
+Visualize glucose risk using advanced clinical metrics: LBGI (Low Blood Glucose Index), HBGI (High Blood Glucose Index), and ADRR (Average Daily Risk Range).
+
+**Features:**
+- Adjustable end date filter (defaults to today)
+- Three separate sections, each with three time window charts
+- All windows anchored at 5:00 AM as reference point (same as CV charts)
+
+**Chart Sections:**
+
+1. **Low Blood Glucose Index (LBGI)**
+   - Measures hypoglycemia risk (low blood sugar events)
+   - Three charts: 7d/12h, 30d/48h, 30d/5d
+   - Threshold bands:
+     - Green (0-2.5): Low risk
+     - Yellow (2.5-5): Moderate risk
+     - Red (>5): High risk
+
+2. **High Blood Glucose Index (HBGI)**
+   - Measures hyperglycemia risk (high blood sugar events)
+   - Three charts: 7d/12h, 30d/48h, 30d/5d
+   - Threshold bands:
+     - Green (0-4.5): Low risk
+     - Yellow (4.5-9): Moderate risk
+     - Red (>9): High risk
+
+3. **Average Daily Risk Range (ADRR)**
+   - Measures overall glycemic variability combining low and high risks
+   - Three charts: 7d/12h, 30d/48h, 30d/5d
+   - Threshold bands:
+     - Green (0-20): Low risk
+     - Yellow (20-40): Moderate risk
+     - Red (>40): High risk
+
+**Calculation Formulas:**
+
+**Risk Function:**
+```
+f(G) = 1.509 × (ln(G)^1.084 - 5.381)
+```
+where G is glucose in mg/dL
+
+**LBGI:**
+```
+rl(G) = 10 × f(G)² if f(G) < 0, else 0
+LBGI = Σ rl(G) / n
+```
+
+**HBGI:**
+```
+rh(G) = 10 × f(G)² if f(G) > 0, else 0
+HBGI = Σ rh(G) / n
+```
+
+**ADRR:**
+```
+Daily RR = LBGIday + HBGIday
+ADRR = Σ (Daily RR) / number_of_days
+```
+
+**Implementation Details:**
+
+**Backend:**
+- New API endpoint: `/api/dashboard/risk-metrics`
+  - Accepts parameters: `end_date` (defaults to today)
+  - Returns JSON with nine arrays (3 metrics × 3 time windows)
+  - Reuses same time window generation as CV charts
+- Functions:
+  - `calculate_risk_function(glucose)` - Computes f(G) transformation
+  - `calculate_lbgi(data)` - Computes LBGI for dataset
+  - `calculate_hbgi(data)` - Computes HBGI for dataset
+  - `calculate_adrr(glucose_rows, windows)` - Computes ADRR by grouping by day
+  - `calculate_risk_metric_data(...)` - Aggregates LBGI/HBGI per window
+  - `calculate_adrr_data(...)` - Aggregates ADRR per window
+
+**Frontend:**
+- Nine Chart.js line charts organized into three sections
+- Blue color scheme matching CV charts (#667eea)
+- Colored threshold bands (green/yellow/red) rendered behind data lines
+- X-axis labels hidden but preserved for tooltips
+- Single "Update Charts" button refreshes all nine charts
+- Responsive design for mobile and desktop
+
+**Visual Design:**
+- Threshold bands use `drawTime: 'beforeDatasetsDraw'` to appear behind chart lines
+- Band colors: semi-transparent (0.3 alpha) for subtle background indication
+- Bands adjust dynamically based on max data value
+
+---
+
+### 5. Nutrition List
 
 **Display:**
 Table listing all nutrition master records
