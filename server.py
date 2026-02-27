@@ -6,6 +6,7 @@ import json
 import sqlite3
 import urllib.parse
 from datetime import datetime, date, timedelta
+from contextlib import contextmanager
 import os
 import ssl
 from collections import defaultdict
@@ -25,27 +26,31 @@ SERVER_KEY_PATH = os.environ.get('SERVER_KEY', os.path.join(CERTS_DIR, 'server',
 # Database Helper Functions
 # ============================================================================
 
+@contextmanager
 def get_db_connection():
-    """Create and return a database connection."""
-    return sqlite3.connect(DB_PATH)
+    """Context manager for database connections with automatic cleanup."""
+    conn = sqlite3.connect(DB_PATH)
+    try:
+        yield conn
+    finally:
+        conn.close()
 
 
 def execute_query(query, params=(), fetch_one=False, commit=False):
     """Execute a query and return results or commit changes."""
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute(query, params)
-    
-    if commit:
-        conn.commit()
-        result = True
-    elif fetch_one:
-        result = cursor.fetchone()
-    else:
-        result = cursor.fetchall()
-    
-    conn.close()
-    return result
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute(query, params)
+        
+        if commit:
+            conn.commit()
+            result = True
+        elif fetch_one:
+            result = cursor.fetchone()
+        else:
+            result = cursor.fetchall()
+        
+        return result
 
 
 # ============================================================================
@@ -1010,28 +1015,27 @@ class GlucoseHandler(http.server.SimpleHTTPRequestHandler):
     
     def handle_get_previous_window_intake(self):
         prev_start, prev_end = get_previous_time_window()
-        conn = get_db_connection()
-        cursor = conn.cursor()
         
-        # Get intake records
-        cursor.execute('''SELECT i.nutrition_id, n.nutrition_name, i.nutrition_amount
-                         FROM intake i
-                         JOIN nutrition n ON i.nutrition_id = n.id
-                         WHERE i.timestamp BETWEEN ? AND ?
-                         ORDER BY i.timestamp ASC''',
-                      (prev_start, prev_end))
-        intake_rows = cursor.fetchall()
-        
-        # Get supplement intake records
-        cursor.execute('''SELECT si.supplement_id, s.supplement_name, si.supplement_amount
-                         FROM supplement_intake si
-                         JOIN supplements s ON si.supplement_id = s.id
-                         WHERE si.timestamp BETWEEN ? AND ?
-                         ORDER BY si.timestamp ASC''',
-                      (prev_start, prev_end))
-        supplement_rows = cursor.fetchall()
-        
-        conn.close()
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            
+            # Get intake records
+            cursor.execute('''SELECT i.nutrition_id, n.nutrition_name, i.nutrition_amount
+                             FROM intake i
+                             JOIN nutrition n ON i.nutrition_id = n.id
+                             WHERE i.timestamp BETWEEN ? AND ?
+                             ORDER BY i.timestamp ASC''',
+                          (prev_start, prev_end))
+            intake_rows = cursor.fetchall()
+            
+            # Get supplement intake records
+            cursor.execute('''SELECT si.supplement_id, s.supplement_name, si.supplement_amount
+                             FROM supplement_intake si
+                             JOIN supplements s ON si.supplement_id = s.id
+                             WHERE si.timestamp BETWEEN ? AND ?
+                             ORDER BY si.timestamp ASC''',
+                          (prev_start, prev_end))
+            supplement_rows = cursor.fetchall()
         
         intake_records = [{'nutrition_id': row[0], 'nutrition_name': row[1], 
                           'nutrition_amount': row[2]} for row in intake_rows]
@@ -1075,39 +1079,38 @@ class GlucoseHandler(http.server.SimpleHTTPRequestHandler):
         
         end_date = query_params.get('end_date', [default_end])[0]
         
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        
-        # Get all dates in range
-        start_dt = datetime.strptime(start_date, '%Y-%m-%d')
-        end_dt = datetime.strptime(end_date, '%Y-%m-%d')
-        
-        summary_data = []
-        current_dt = start_dt
-        
-        while current_dt <= end_dt:
-            date_str = current_dt.strftime('%Y-%m-%d')
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
             
-            # Process Day window (05:00-16:59)
-            day_window_start = f'{date_str} 05:00:00'
-            day_window_end = f'{date_str} 16:59:59'
-            day_data = process_time_window_summary(cursor, '☀️', date_str, 
-                                                 day_window_start, day_window_end)
-            if day_data:
-                summary_data.append(day_data)
+            # Get all dates in range
+            start_dt = datetime.strptime(start_date, '%Y-%m-%d')
+            end_dt = datetime.strptime(end_date, '%Y-%m-%d')
             
-            # Process Night window (17:00 to 04:59 next day)
-            night_window_start = f'{date_str} 17:00:00'
-            next_day = (current_dt + timedelta(days=1)).strftime('%Y-%m-%d')
-            night_window_end = f'{next_day} 04:59:59'
-            night_data = process_time_window_summary(cursor, '🌙', date_str, 
-                                                 night_window_start, night_window_end)
-            if night_data:
-                summary_data.append(night_data)
+            summary_data = []
+            current_dt = start_dt
             
-            current_dt += timedelta(days=1)
+            while current_dt <= end_dt:
+                date_str = current_dt.strftime('%Y-%m-%d')
+                
+                # Process Day window (05:00-16:59)
+                day_window_start = f'{date_str} 05:00:00'
+                day_window_end = f'{date_str} 16:59:59'
+                day_data = process_time_window_summary(cursor, '☀️', date_str, 
+                                                     day_window_start, day_window_end)
+                if day_data:
+                    summary_data.append(day_data)
+                
+                # Process Night window (17:00 to 04:59 next day)
+                night_window_start = f'{date_str} 17:00:00'
+                next_day = (current_dt + timedelta(days=1)).strftime('%Y-%m-%d')
+                night_window_end = f'{next_day} 04:59:59'
+                night_data = process_time_window_summary(cursor, '🌙', date_str, 
+                                                     night_window_start, night_window_end)
+                if night_data:
+                    summary_data.append(night_data)
+                
+                current_dt += timedelta(days=1)
         
-        conn.close()
         self._send_json(summary_data)
     
     def handle_get_cv_charts(self, query_params):

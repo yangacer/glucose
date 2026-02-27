@@ -752,6 +752,39 @@ The application supports mutual TLS authentication to ensure secure, authenticat
 
 # Database Performance & Indexing
 
+## Connection Management
+
+**Context Manager Pattern:**
+All database connections use Python's `contextlib.contextmanager` decorator for automatic cleanup:
+
+```python
+@contextmanager
+def get_db_connection():
+    """Context manager for database connections with automatic cleanup."""
+    conn = sqlite3.connect(DB_PATH)
+    try:
+        yield conn
+    finally:
+        conn.close()
+```
+
+**Benefits:**
+- Automatic connection closure even on exceptions
+- Prevents connection leaks
+- Cleaner code with `with` statements
+- No manual `conn.close()` calls needed
+
+**Usage Pattern:**
+```python
+with get_db_connection() as conn:
+    cursor = conn.cursor()
+    cursor.execute(query, params)
+    results = cursor.fetchall()
+# Connection automatically closed here
+```
+
+**Note:** Connection pooling is not implemented as this is a low-traffic personal application. Single-connection-per-request is sufficient and simpler.
+
 ## Current Indexing Strategy
 
 All timestamp columns are indexed for optimal query performance:
