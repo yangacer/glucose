@@ -10,7 +10,7 @@ This test suite validates all API endpoints and database operations:
 - Nutrition intake records (CRUD)
 - Supplement intake records (CRUD)
 - Event records (CRUD)
-- Dashboard endpoints (glucose chart, summary timesheet)
+- Dashboard endpoints (glucose chart, summary timesheet, CV charts)
 - Time-window queries (previous intake window)
 - Date range filtering
 
@@ -26,6 +26,8 @@ from datetime import datetime, timedelta
 from http.client import HTTPConnection
 import time
 import subprocess
+from init_db import create_schema
+
 
 class TestGlucoseAPI(unittest.TestCase):
     
@@ -33,89 +35,51 @@ class TestGlucoseAPI(unittest.TestCase):
     def setUpClass(cls):
         """Start the server before running tests"""
         cls.test_db = 'test_glucose.db'
-        cls.port = 8001  # Test server port
-        cls.server_process = None
+        cls.port = 8001
+        cls.host = 'localhost'
+        cls.base_url = f'http://{cls.host}:{cls.port}'
         
-        # Create test database
+        # Remove existing test database
         if os.path.exists(cls.test_db):
             os.remove(cls.test_db)
         
-        # Configure server to use test database and port
-        os.environ['DB_PATH'] = cls.test_db
-        os.environ['PORT'] = str(cls.port)
-        os.environ['MTLS_ENABLED'] = 'false'  # Disable mTLS for tests
-        
-        # Initialize test database
+        # Create test database with schema (reusing init_db.py)
         conn = sqlite3.connect(cls.test_db)
-        cursor = conn.cursor()
-        
-        cursor.execute('''
-        CREATE TABLE glucose (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            timestamp DATETIME NOT NULL,
-            level INTEGER NOT NULL
-        )
-        ''')
-        
-        cursor.execute('''
-        CREATE TABLE insulin (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            timestamp DATETIME NOT NULL,
-            level REAL NOT NULL
-        )
-        ''')
-        
-        cursor.execute('''
-        CREATE TABLE nutrition (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            nutrition_name TEXT NOT NULL,
-            kcal REAL NOT NULL,
-            weight REAL NOT NULL,
-            kcal_per_gram REAL GENERATED ALWAYS AS (kcal / weight) STORED
-        )
-        ''')
-        
-        cursor.execute('''
-        CREATE TABLE intake (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            nutrition_id INTEGER REFERENCES nutrition(id),
-            timestamp DATETIME NOT NULL,
-            nutrition_amount REAL NOT NULL,
-            nutrition_kcal REAL NOT NULL
-        )
-        ''')
-        
-        cursor.execute('''
-        CREATE TABLE supplements (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            supplement_name TEXT NOT NULL,
-            default_amount REAL DEFAULT 1
-        )
-        ''')
-        
-        cursor.execute('''
-        CREATE TABLE supplement_intake (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            timestamp DATETIME NOT NULL,
-            supplement_id INTEGER REFERENCES supplements(id),
-            supplement_amount REAL NOT NULL
-        )
-        ''')
-        
-        cursor.execute('''
-        CREATE TABLE event (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            timestamp DATETIME NOT NULL,
-            event_name TEXT NOT NULL,
-            event_notes TEXT
-        )
-        ''')
-        
-        conn.commit()
+        create_schema(conn)
         conn.close()
         
-        cls.host = 'localhost'
-        cls.base_url = f'http://{cls.host}:{cls.port}'
+        # Configure and start server
+        server_env = os.environ.copy()
+        server_env['DB_PATH'] = cls.test_db
+        server_env['PORT'] = str(cls.port)
+        server_env['MTLS_ENABLED'] = 'false'
+        
+        print(f"Starting test server on port {cls.port}...")
+        cls.server_process = subprocess.Popen(
+            ['python3', 'server.py'],
+            env=server_env,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            cwd=os.path.dirname(os.path.abspath(__file__))
+        )
+        
+        # Wait for server to start with connection retry
+        max_retries = 10
+        for i in range(max_retries):
+            time.sleep(0.5)
+            try:
+                conn = HTTPConnection(cls.host, cls.port, timeout=1)
+                conn.request('GET', '/api/glucose')
+                conn.getresponse()
+                conn.close()
+                print("Test server is ready.")
+                break
+            except:
+                if i == max_retries - 1:
+                    # Server failed to start, get error output
+                    stdout, stderr = cls.server_process.communicate(timeout=1)
+                    print(f"Server failed to start. stderr: {stderr.decode()}")
+                    raise RuntimeError("Test server failed to start")
     
     @classmethod
     def tearDownClass(cls):
@@ -597,129 +561,6 @@ class TestGlucoseAPI(unittest.TestCase):
         self.assertIsInstance(data['cv_30d_48h'], list)
         self.assertIsInstance(data['cv_30d_5d'], list)
 
-def run_tests_with_server():
-    """Run tests with a temporary test server"""
-    print("Setting up test environment...")
-    
-    # Create test database
-    test_db = 'test_glucose.db'
-    test_port = 8001
-    
-    if os.path.exists(test_db):
-        os.remove(test_db)
-    
-    # Start server on test port with test database
-    print(f"Starting test server on port {test_port}...")
-    server_env = os.environ.copy()
-    server_env['DB_PATH'] = test_db
-    server_env['PORT'] = str(test_port)
-    server_env['MTLS_ENABLED'] = 'false'
-    
-    # Initialize test database using init_db logic
-    conn = sqlite3.connect(test_db)
-    cursor = conn.cursor()
-    
-    cursor.execute('''
-    CREATE TABLE glucose (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        timestamp DATETIME NOT NULL,
-        level INTEGER NOT NULL
-    )
-    ''')
-    cursor.execute('CREATE INDEX idx_glucose_timestamp ON glucose(timestamp)')
-    
-    cursor.execute('''
-    CREATE TABLE insulin (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        timestamp DATETIME NOT NULL,
-        level REAL NOT NULL
-    )
-    ''')
-    cursor.execute('CREATE INDEX idx_insulin_timestamp ON insulin(timestamp)')
-    
-    cursor.execute('''
-    CREATE TABLE nutrition (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        nutrition_name TEXT NOT NULL,
-        kcal REAL NOT NULL,
-        weight REAL NOT NULL,
-        kcal_per_gram REAL GENERATED ALWAYS AS (kcal / weight) STORED
-    )
-    ''')
-    
-    cursor.execute('''
-    CREATE TABLE intake (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        nutrition_id INTEGER REFERENCES nutrition(id),
-        timestamp DATETIME NOT NULL,
-        nutrition_amount REAL NOT NULL,
-        nutrition_kcal REAL NOT NULL
-    )
-    ''')
-    cursor.execute('CREATE INDEX idx_intake_timestamp ON intake(timestamp)')
-    cursor.execute('CREATE INDEX idx_intake_nutrition_id ON intake(nutrition_id)')
-    
-    cursor.execute('''
-    CREATE TABLE supplements (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        supplement_name TEXT NOT NULL,
-        default_amount REAL DEFAULT 1
-    )
-    ''')
-    
-    cursor.execute('''
-    CREATE TABLE supplement_intake (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        timestamp DATETIME NOT NULL,
-        supplement_id INTEGER REFERENCES supplements(id),
-        supplement_amount REAL NOT NULL
-    )
-    ''')
-    cursor.execute('CREATE INDEX idx_supplement_intake_timestamp ON supplement_intake(timestamp)')
-    cursor.execute('CREATE INDEX idx_supplement_intake_supplement_id ON supplement_intake(supplement_id)')
-    
-    cursor.execute('''
-    CREATE TABLE event (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        timestamp DATETIME NOT NULL,
-        event_name TEXT NOT NULL,
-        event_notes TEXT
-    )
-    ''')
-    cursor.execute('CREATE INDEX idx_event_timestamp ON event(timestamp)')
-    
-    conn.commit()
-    conn.close()
-    
-    # Start server
-    server_process = subprocess.Popen(
-        ['python3', 'server.py'],
-        env=server_env,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE
-    )
-    
-    # Wait for server to start
-    time.sleep(2)
-    
-    try:
-        # Run tests
-        print("\nRunning tests...\n")
-        suite = unittest.TestLoader().loadTestsFromTestCase(TestGlucoseAPI)
-        runner = unittest.TextTestRunner(verbosity=2)
-        result = runner.run(suite)
-        
-        return result.wasSuccessful()
-    
-    finally:
-        # Cleanup
-        print("\nCleaning up...")
-        server_process.terminate()
-        server_process.wait()
-        
-        if os.path.exists(test_db):
-            os.remove(test_db)
 
 if __name__ == '__main__':
-    success = run_tests_with_server()
-    sys.exit(0 if success else 1)
+    unittest.main(verbosity=2)

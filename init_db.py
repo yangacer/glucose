@@ -5,12 +5,15 @@ import os
 
 DB_PATH = 'glucose.db'
 
-def init_database():
-    if os.path.exists(DB_PATH):
-        print(f"Database {DB_PATH} already exists. Skipping creation.")
-        return
+
+def create_schema(conn):
+    """
+    Create database schema with tables and indexes.
+    Single source of truth for schema definition.
     
-    conn = sqlite3.connect(DB_PATH)
+    Args:
+        conn: SQLite database connection
+    """
     cursor = conn.cursor()
     
     # Create glucose table
@@ -21,6 +24,7 @@ def init_database():
         level INTEGER NOT NULL
     )
     ''')
+    cursor.execute('CREATE INDEX idx_glucose_timestamp ON glucose(timestamp)')
     
     # Create insulin table
     cursor.execute('''
@@ -30,6 +34,7 @@ def init_database():
         level REAL NOT NULL
     )
     ''')
+    cursor.execute('CREATE INDEX idx_insulin_timestamp ON insulin(timestamp)')
     
     # Create nutrition table
     cursor.execute('''
@@ -52,6 +57,8 @@ def init_database():
         nutrition_kcal REAL NOT NULL
     )
     ''')
+    cursor.execute('CREATE INDEX idx_intake_timestamp ON intake(timestamp)')
+    cursor.execute('CREATE INDEX idx_intake_nutrition_id ON intake(nutrition_id)')
     
     # Create supplements table (master)
     cursor.execute('''
@@ -71,6 +78,8 @@ def init_database():
         supplement_amount REAL NOT NULL
     )
     ''')
+    cursor.execute('CREATE INDEX idx_supplement_intake_timestamp ON supplement_intake(timestamp)')
+    cursor.execute('CREATE INDEX idx_supplement_intake_supplement_id ON supplement_intake(supplement_id)')
     
     # Create event table
     cursor.execute('''
@@ -81,20 +90,23 @@ def init_database():
         event_notes TEXT
     )
     ''')
-    
-    # Create indexes
-    cursor.execute('CREATE INDEX idx_glucose_timestamp ON glucose(timestamp)')
-    cursor.execute('CREATE INDEX idx_insulin_timestamp ON insulin(timestamp)')
-    cursor.execute('CREATE INDEX idx_intake_timestamp ON intake(timestamp)')
-    cursor.execute('CREATE INDEX idx_intake_nutrition_id ON intake(nutrition_id)')
-    cursor.execute('CREATE INDEX idx_supplement_intake_timestamp ON supplement_intake(timestamp)')
-    cursor.execute('CREATE INDEX idx_supplement_intake_supplement_id ON supplement_intake(supplement_id)')
     cursor.execute('CREATE INDEX idx_event_timestamp ON event(timestamp)')
     
     conn.commit()
+
+
+def init_database():
+    """Initialize production database if it doesn't exist"""
+    if os.path.exists(DB_PATH):
+        print(f"Database {DB_PATH} already exists. Skipping creation.")
+        return
+    
+    conn = sqlite3.connect(DB_PATH)
+    create_schema(conn)
     conn.close()
     
     print(f"Database {DB_PATH} created successfully!")
+
 
 if __name__ == '__main__':
     init_database()
