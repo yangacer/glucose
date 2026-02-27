@@ -337,7 +337,7 @@ function renderCVChart(canvasId, data, chartInstance) {
                             type: 'box',
                             yMin: 0,
                             yMax: 20,
-                            backgroundColor: 'rgba(0, 255, 0, 0.5)',
+                            backgroundColor: 'rgba(0, 255, 0, 0.3)',
                             borderWidth: 0,
                             drawTime: 'beforeDatasetsDraw'
                         },
@@ -345,7 +345,7 @@ function renderCVChart(canvasId, data, chartInstance) {
                             type: 'box',
                             yMin: 20,
                             yMax: 30,
-                            backgroundColor: 'rgba(255, 255, 0, 0.5)',
+                            backgroundColor: 'rgba(255, 255, 0, 0.3)',
                             borderWidth: 0,
                             drawTime: 'beforeDatasetsDraw'
                         },
@@ -353,7 +353,7 @@ function renderCVChart(canvasId, data, chartInstance) {
                             type: 'box',
                             yMin: 30,
                             yMax: Math.max(maxCV, 40),
-                            backgroundColor: 'rgba(255, 0, 0, 0.5)',
+                            backgroundColor: 'rgba(255, 0, 0, 0.3)',
                             borderWidth: 0,
                             drawTime: 'beforeDatasetsDraw'
                         }

@@ -355,6 +355,14 @@ All CV charts display colored background bands to indicate glucose variability l
 
 Bands are rendered as background boxes using Chart.js annotation plugin, allowing data points and line to appear on top for clear visibility.
 
+**Band Colors:**
+All CV and risk metric charts use consistent semi-transparent colors (alpha: 0.3):
+- Green: `rgba(0, 255, 0, 0.3)`
+- Yellow: `rgba(255, 255, 0, 0.3)`
+- Red: `rgba(255, 0, 0, 0.3)`
+
+Bands are rendered using `drawTime: 'beforeDatasetsDraw'` to ensure they appear behind chart lines.
+
 **Window Generation Logic:**
 - Anchor point: 5:00 AM on the selected end date
 - Walks backward in time creating fixed-size windows
