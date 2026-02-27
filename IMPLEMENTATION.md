@@ -10,13 +10,19 @@ This document describes the technical implementation details for developers. For
 
 # Architecture
 
-**Pattern:** Traditional server-side web application with REST API
+**Pattern:** Multi-threaded server-side web application with REST API
 
 **Components:**
 - `server.py`: HTTP server with REST API endpoints and business logic
 - `init_db.py`: Database schema management
 - `static/`: Frontend HTML/CSS/JavaScript
 - `test_server.py`: Test suite
+
+**Threading Model:**
+- Uses `socketserver.ThreadingTCPServer` for concurrent request handling
+- Each request handled in separate daemon thread
+- Prevents one slow request from blocking others
+- Threads automatically cleaned up when request completes
 
 ---
 
@@ -368,6 +374,50 @@ MTLS_ENABLED=false PORT=8000 python3 server.py
 ---
 
 # Troubleshooting
+
+## Server Stops Responding / Page Hangs
+
+**Symptoms:**
+- Browser loading indefinitely
+- No error messages
+- Server process still running but unresponsive
+
+**Root Causes & Fixes:**
+
+**1. Single-threaded server (FIXED)**
+- **Problem:** `TCPServer` handles one request at a time
+- **Solution:** Now uses `ThreadingTCPServer` for concurrent requests
+- **Impact:** One slow/hanging request won't block others
+
+**2. Unhandled exceptions (FIXED)**
+- **Problem:** Exception in request handler leaves client waiting forever
+- **Solution:** All HTTP methods (GET/POST/PUT/DELETE) now have try-except
+- **Impact:** Errors return 500 response instead of hanging
+
+**3. Database connection leaks (FIXED)**
+- **Problem:** Unclosed connections could exhaust SQLite resources
+- **Solution:** Context managers ensure cleanup even on exceptions
+- **Impact:** Connections always released properly
+
+**4. JSON parsing errors (FIXED)**
+- **Problem:** Malformed JSON in POST/PUT causes uncaught exception
+- **Solution:** Separate try-except for JSON parsing returns 400 error
+- **Impact:** Client receives clear error message
+
+**Diagnostic Steps:**
+```bash
+# Check server logs for exceptions
+tail -f server.log  # if logging to file
+
+# Check which requests are being processed
+# Look for timestamps in console output
+
+# Test with curl to isolate browser issues
+curl -v http://localhost:8000/api/glucose
+
+# Check database locks
+sqlite3 glucose.db "PRAGMA busy_timeout;"
+```
 
 ## Tests Failing
 - Check if port 8001 is available: `lsof -i :8001`

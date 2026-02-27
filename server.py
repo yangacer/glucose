@@ -821,35 +821,50 @@ class GlucoseHandler(http.server.SimpleHTTPRequestHandler):
     def do_OPTIONS(self):
         self._set_headers()
     
+    def log_message(self, format, *args):
+        """Override to add timestamp to request logs"""
+        timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        print(f"[{timestamp}] {format % args}")
+    
     def do_GET(self):
-        parsed_path = urllib.parse.urlparse(self.path)
-        path = parsed_path.path
-        query_params = urllib.parse.parse_qs(parsed_path.query)
-        
-        route_handlers = {
-            '/api/nutrition': lambda: self._send_json(DataAccess.get_nutrition_list()),
-            '/api/supplements': lambda: self._send_json(DataAccess.get_supplements_list()),
-            '/api/intake/previous-window': self.handle_get_previous_window_intake,
-            '/api/glucose': lambda: self.handle_get_list('glucose', query_params),
-            '/api/insulin': lambda: self.handle_get_list('insulin', query_params),
-            '/api/intake': lambda: self.handle_get_intake_list(query_params),
-            '/api/supplement-intake': lambda: self.handle_get_supplement_intake_list(query_params),
-            '/api/event': lambda: self.handle_get_event_list(query_params),
-            '/api/dashboard/glucose-chart': lambda: self.handle_get_glucose_chart(query_params),
-            '/api/dashboard/summary': lambda: self.handle_get_summary(query_params),
-            '/api/dashboard/cv-charts': lambda: self.handle_get_cv_charts(query_params),
-            '/api/dashboard/risk-metrics': lambda: self.handle_get_risk_metrics(query_params),
-        }
-        
-        if path in route_handlers:
-            route_handlers[path]()
-        else:
-            super().do_GET()
+        try:
+            parsed_path = urllib.parse.urlparse(self.path)
+            path = parsed_path.path
+            query_params = urllib.parse.parse_qs(parsed_path.query)
+            
+            route_handlers = {
+                '/api/nutrition': lambda: self._send_json(DataAccess.get_nutrition_list()),
+                '/api/supplements': lambda: self._send_json(DataAccess.get_supplements_list()),
+                '/api/intake/previous-window': self.handle_get_previous_window_intake,
+                '/api/glucose': lambda: self.handle_get_list('glucose', query_params),
+                '/api/insulin': lambda: self.handle_get_list('insulin', query_params),
+                '/api/intake': lambda: self.handle_get_intake_list(query_params),
+                '/api/supplement-intake': lambda: self.handle_get_supplement_intake_list(query_params),
+                '/api/event': lambda: self.handle_get_event_list(query_params),
+                '/api/dashboard/glucose-chart': lambda: self.handle_get_glucose_chart(query_params),
+                '/api/dashboard/summary': lambda: self.handle_get_summary(query_params),
+                '/api/dashboard/cv-charts': lambda: self.handle_get_cv_charts(query_params),
+                '/api/dashboard/risk-metrics': lambda: self.handle_get_risk_metrics(query_params),
+            }
+            
+            if path in route_handlers:
+                route_handlers[path]()
+            else:
+                super().do_GET()
+        except Exception as e:
+            self._send_error_json(f'Server error: {str(e)}', 500)
     
     def do_POST(self):
-        content_length = int(self.headers['Content-Length'])
-        post_data = self.rfile.read(content_length)
-        data = json.loads(post_data.decode('utf-8'))
+        try:
+            content_length = int(self.headers['Content-Length'])
+            post_data = self.rfile.read(content_length)
+            data = json.loads(post_data.decode('utf-8'))
+        except (ValueError, json.JSONDecodeError) as e:
+            self._send_error_json(f'Invalid JSON: {str(e)}', 400)
+            return
+        except Exception as e:
+            self._send_error_json(f'Request error: {str(e)}', 400)
+            return
         
         try:
             if self.path == '/api/glucose':
@@ -885,9 +900,16 @@ class GlucoseHandler(http.server.SimpleHTTPRequestHandler):
             self._send_error_json(f'Server error: {str(e)}', 500)
     
     def do_PUT(self):
-        content_length = int(self.headers['Content-Length'])
-        post_data = self.rfile.read(content_length)
-        data = json.loads(post_data.decode('utf-8'))
+        try:
+            content_length = int(self.headers['Content-Length'])
+            post_data = self.rfile.read(content_length)
+            data = json.loads(post_data.decode('utf-8'))
+        except (ValueError, json.JSONDecodeError) as e:
+            self._send_error_json(f'Invalid JSON: {str(e)}', 400)
+            return
+        except Exception as e:
+            self._send_error_json(f'Request error: {str(e)}', 400)
+            return
         
         try:
             record_id = int(self.path.split('/')[-1])
@@ -1276,6 +1298,7 @@ def main():
         return
     
     socketserver.TCPServer.allow_reuse_address = True
+    socketserver.ThreadingTCPServer.daemon_threads = True
     
     if MTLS_ENABLED:
         # Check if certificate files exist
@@ -1285,21 +1308,23 @@ def main():
             print("Or set MTLS_ENABLED=false to disable mTLS.")
             return
         
-        # Create HTTPS server with mTLS
-        with socketserver.TCPServer(("", PORT), SecureGlucoseHandler) as httpd:
+        # Create HTTPS server with mTLS (multi-threaded)
+        with socketserver.ThreadingTCPServer(("", PORT), SecureGlucoseHandler) as httpd:
             ssl_context = create_ssl_context()
             httpd.socket = ssl_context.wrap_socket(httpd.socket, server_side=True)
             
             print(f"✓ mTLS enabled - Server running at https://localhost:{PORT}/")
             print(f"  Clients must present valid certificates signed by the CA")
+            print(f"  Multi-threaded mode: Handles concurrent requests")
             print(f"  See CLIENT.md for client configuration instructions")
             httpd.serve_forever()
     else:
-        # Run without mTLS (development mode)
+        # Run without mTLS (development mode, multi-threaded)
         print("WARNING: mTLS is DISABLED - running in insecure mode!")
         print(f"Server running at http://localhost:{PORT}/")
+        print(f"Multi-threaded mode: Handles concurrent requests")
         
-        with socketserver.TCPServer(("", PORT), GlucoseHandler) as httpd:
+        with socketserver.ThreadingTCPServer(("", PORT), GlucoseHandler) as httpd:
             httpd.serve_forever()
 
 
