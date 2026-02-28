@@ -194,6 +194,50 @@ route_handlers = {
 - `tabs.js` - Tab navigation
 - `main.js` - Application initialization
 
+**Dependency Order:**
+- Defined in `static/index.html.dev` as single source of truth
+- Must load in order: config → utils → tabs/dashboard/etc → main
+- `build-js.py` extracts order from `index.html.dev` automatically
+
+## Development vs Production
+
+**Development Mode (`MTLS_ENABLED=false`):**
+- Server serves `static/index.html.dev`
+- Individual JS files loaded separately (unminified)
+- Easy debugging with readable code and line numbers
+- No build step required during development
+- Fast iteration: edit JS → refresh browser
+
+**Production Mode (`MTLS_ENABLED=true`):**
+- Server serves `static/index.html`
+- Single minified bundle `js/release/app.min.js?v=x.y.z`
+- Optimized for performance and caching
+- Built with `./build-js.py`
+
+**Build Process:**
+```bash
+# Generate minified bundle from current version
+./build-js.py
+
+# Or bump version
+./build-js.py 0.6.0
+```
+
+**Build script (`build-js.py`):**
+1. Reads script order from `static/index.html.dev`
+2. Scans `static/js/` for `*.js` files (excludes `*.min.js` and chart files)
+3. Combines files in dependency order
+4. Minifies with terser
+5. Generates `static/index.html` with versioned script tag
+
+**Key Files:**
+- `static/index.html.dev` - Development HTML (single source of truth for script order)
+- `static/index.html` - Production HTML (auto-generated)
+- `static/js/release/app.min.js` - Minified bundle (auto-generated)
+- `build-js.py` - Build script
+
+See `DEPLOY.md` for detailed workflow documentation.
+
 ## Key Patterns
 
 ### Chart Rendering
@@ -301,24 +345,32 @@ route_handlers = {
 # Run all tests
 python3 test_server.py
 
-# Test specific functionality manually
+# Test in development mode (unminified JS)
 MTLS_ENABLED=false PORT=8000 python3 server.py
+
+# Test in production mode (minified JS)
+# First build the bundle:
+./build-js.py
+# Then start server:
+MTLS_ENABLED=true PORT=8443 python3 server.py
 ```
 
 ## Common Patterns
 
 **Adding a new chart:**
 1. Create API endpoint returning `[{"label": str, "value": float}]` format
-2. Add canvas element to `index.html`
+2. Add canvas element to `index.html.dev`
 3. Create render function in `dashboard.js` following CV/risk metric patterns
 4. Call render function from `loadDashboard()`
+5. Run `./build-js.py` to regenerate production HTML
 
 **Adding a new input form:**
-1. Add section to `index.html` with form and audit table
+1. Add section to `index.html.dev` with form and audit table
 2. Create POST handler in `server.py`
 3. Add form submission handler in `forms.js`
 4. Add audit listing in `audit.js`
 5. Add date input initialization in `utils.js`
+6. Run `./build-js.py` to regenerate production HTML
 
 ---
 
@@ -453,6 +505,23 @@ sqlite3 glucose.db "PRAGMA busy_timeout;"
 - Add to `create_schema()` function
 - Document rationale in this file
 - Analyze query performance if needed
+
+## JavaScript Updates
+
+**During development:**
+1. Edit JS files in `static/js/`
+2. Test with `MTLS_ENABLED=false` (uses `index.html.dev`)
+3. No build step needed
+
+**Before production deployment:**
+1. Update version: `./build-js.py <new_version>`
+2. Test with `MTLS_ENABLED=true` to verify minified bundle
+3. Commit both `index.html.dev` and generated `index.html`
+
+**Changing script dependency order:**
+1. Edit `static/index.html.dev` (single source of truth)
+2. Run `./build-js.py` to regenerate bundle
+3. Test both dev and prod modes
 
 ## Certificate Renewal
 ```bash

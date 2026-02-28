@@ -795,10 +795,17 @@ class DataAccess:
 
 class GlucoseHandler(http.server.SimpleHTTPRequestHandler):
     
+    def guess_type(self, path):
+        """Override to properly handle .dev extension as HTML."""
+        if path.endswith('.html.dev'):
+            return 'text/html'
+        return super().guess_type(path)
+    
     def list_directory(self, path):
-        """Redirect root directory to index.html."""
+        """Redirect root directory to index.html (or index.html.dev in dev mode)."""
+        index_file = 'index.html.dev' if not MTLS_ENABLED else 'index.html'
         self.send_response(301)
-        self.send_header('Location', '/static/index.html')
+        self.send_header('Location', f'/static/{index_file}')
         self.end_headers()
         return None
     
@@ -831,6 +838,13 @@ class GlucoseHandler(http.server.SimpleHTTPRequestHandler):
             parsed_path = urllib.parse.urlparse(self.path)
             path = parsed_path.path
             query_params = urllib.parse.parse_qs(parsed_path.query)
+            
+            # In dev mode (MTLS_ENABLED=false), redirect index.html to index.html.dev
+            if not MTLS_ENABLED and path == '/static/index.html':
+                self.send_response(301)
+                self.send_header('Location', '/static/index.html.dev')
+                self.end_headers()
+                return
             
             route_handlers = {
                 '/api/nutrition': lambda: self._send_json(DataAccess.get_nutrition_list()),
