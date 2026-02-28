@@ -186,10 +186,10 @@ route_handlers = {
 
 **Files in `static/js/`:**
 - `config.js` - API base URL configuration
-- `utils.js` - Common utilities (timestamp formatting, date initialization)
+- `utils.js` - Common utilities (timestamp formatting, date initialization, message display, button states)
 - `dashboard.js` - Chart rendering and dashboard loading
-- `forms.js` - Form submission handlers
-- `dynamic-items.js` - Dynamic add/remove for intake form
+- `forms.js` - Form submission handlers with loading states
+- `dynamic-items.js` - Dynamic add/remove for intake form (nutrition and supplements)
 - `audit.js` - Audit/edit listing rendering
 - `tabs.js` - Tab navigation
 - `main.js` - Application initialization
@@ -257,6 +257,190 @@ See `DEPLOY.md` for detailed workflow documentation.
 - "Reset to Now" buttons for quick updates
 - Dynamic item management (nutrition/supplement lists)
 - Validation before submission
+- Visual feedback with loading states and animations
+- Submit button state management (loading, disabled, spinner)
+- Error and success message display with animations
+- Prevention of double-submission through button disabling
+
+---
+
+# UI Components & Visual Feedback
+
+## User Feedback System
+
+**Purpose:** Provide clear, immediate visual feedback for all user actions, especially form submissions.
+
+**Implementation:** Enhanced CSS animations and JavaScript state management.
+
+### Message Display
+
+**File:** `static/js/utils.js`
+
+**Function:** `showMessage(elementId, success, message)`
+
+**Behavior:**
+1. Clears previous message state
+2. Sets message text and class (success/error)
+3. Triggers fade-in animation (10ms delay for CSS transition)
+4. Displays message for timeout duration
+5. Fades out and removes message
+
+**Timeouts:**
+- Success: 5 seconds
+- Error: 8 seconds (60% longer for readability)
+
+**CSS Classes:**
+- `.message` - Base styling with fade transition
+- `.message.show` - Visible state (opacity: 1, translateY: 0)
+- `.message.success` - Green background, checkmark icon
+- `.message.error` - Red background, X icon, shake animation
+
+### Submit Button States
+
+**Functions:**
+- `setButtonLoading(button, loadingText)` - Disables button, shows loading state
+- `resetButton(button)` - Restores button to original state
+
+**Loading State Features:**
+- Text changes to "Submitting..." (customizable)
+- Button disabled (`disabled = true`)
+- Background grays out (`#9ca3af`)
+- Cursor changes to "wait"
+- Animated spinner appears (CSS `::after` pseudo-element)
+- Original text stored in `data-originalText` attribute
+
+**CSS Classes:**
+- `.submitting` - Loading state styling
+- `::after` - Rotating spinner animation (16px, right-aligned)
+
+### Animations
+
+**Shake Animation (Errors Only):**
+```css
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    10%, 30%, 50%, 70%, 90% { transform: translateX(-8px); }
+    20%, 40%, 60%, 80% { transform: translateX(8px); }
+}
+```
+- Duration: 0.4 seconds
+- Oscillation: ±8px horizontal
+- Applied automatically to error messages
+
+**Spinner Animation (Button Loading):**
+```css
+@keyframes spinner {
+    to { transform: rotate(360deg); }
+}
+```
+- Duration: 0.6 seconds linear loop
+- Applied to button `::after` pseudo-element
+- 16px diameter, white border with transparent top
+
+**Fade Transitions:**
+- Fade-in: 0.3s opacity + translateY
+- Fade-out: 0.3s opacity (message hidden after 300ms)
+
+## Dynamic Form Items
+
+**File:** `static/js/dynamic-items.js`
+
+**Purpose:** Manage add/remove of nutrition and supplement items in intake form.
+
+### Key Features:
+
+**Nutrition Items:**
+- Always require at least one item
+- Remove button hidden on last item
+- Automatic renumbering after removal
+- Event listeners attached dynamically
+
+**Supplement Items:**
+- Can remove ALL items (optional supplements) - **v0.7.0**
+- Remove button always visible
+- Supports zero supplement submissions
+- Initial item event listener in `initializeDynamicItems()`
+
+**Functions:**
+- `addNutritionItem()` - Adds new nutrition row
+- `addSupplementItem()` - Adds new supplement row
+- `updateNutritionRemoveButtons()` - Shows/hides remove buttons
+- `updateSupplementRemoveButtons()` - Always shows remove buttons
+- `renumberNutritionItems()` - Updates item numbers after removal
+- `renumberSupplementItems()` - Updates supplement numbers after removal
+
+**Change in v0.7.0:**
+```javascript
+// OLD: Only show when multiple items
+removeBtn.style.display = items.length > 1 ? 'inline-block' : 'none';
+
+// NEW: Always show (allow removing all)
+removeBtn.style.display = 'inline-block';
+```
+
+## Form Submission Flow
+
+**Pattern:** All forms follow consistent submission pattern
+
+**Example Flow (Glucose Form):**
+```javascript
+async (e) => {
+    e.preventDefault();
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+    setButtonLoading(submitBtn);  // Show loading state
+    
+    // Prepare data
+    const data = { /* ... */ };
+    
+    // Submit to API
+    const result = await submitData('/glucose', data);
+    
+    resetButton(submitBtn);  // Restore button
+    showMessage('glucose-message', result.success, result.message);
+    
+    if (result.success) {
+        e.target.reset();
+        loadGlucoseAudit();
+    }
+}
+```
+
+**Applied to Forms:**
+- Glucose, Insulin, Event, Nutrition, Supplements (simple forms)
+- Intake form (complex multi-item with special handling)
+
+**Error Handling:**
+- Network errors caught and displayed
+- Validation errors from server shown with shake
+- Button always reset (success or failure)
+- Try-catch blocks ensure button state restored
+
+## CSS Structure
+
+**File:** `static/css/styles.css`
+
+**Message Styles:**
+- `.message` - Base: padding, border-radius, initial opacity 0
+- `.message.show` - Visible: opacity 1, translateY(0)
+- `.message.success` - Green: #d4edda bg, #155724 text, ✓ icon
+- `.message.error` - Red: #f8d7da bg, #721c24 text, ✖ icon, shake
+
+**Button Styles:**
+- `form button[type="submit"]` - Base styling with transition
+- `button:disabled` - Gray background, not-allowed cursor
+- `button.submitting` - Loading state with spinner
+- `button.submitting::after` - Spinner pseudo-element
+
+**Design Tokens:**
+| Element | Color | Usage |
+|---------|-------|-------|
+| Success bg | #d4edda | Light green background |
+| Success text | #155724 | Dark green text |
+| Success border | #c3e6cb | Medium green border |
+| Error bg | #f8d7da | Light red background |
+| Error text | #721c24 | Dark red text |
+| Error border | #f5c6cb | Medium red border |
+| Loading bg | #9ca3af | Gray for disabled state |
 
 ---
 
@@ -366,11 +550,39 @@ MTLS_ENABLED=true PORT=8443 python3 server.py
 
 **Adding a new input form:**
 1. Add section to `index.html.dev` with form and audit table
-2. Create POST handler in `server.py`
-3. Add form submission handler in `forms.js`
-4. Add audit listing in `audit.js`
-5. Add date input initialization in `utils.js`
-6. Run `./build-js.py` to regenerate production HTML
+2. Add message div: `<div id="formname-message" class="message"></div>`
+3. Create POST handler in `server.py`
+4. Add form submission handler in `forms.js`:
+   - Get submit button: `const submitBtn = e.target.querySelector('button[type="submit"]')`
+   - Set loading: `setButtonLoading(submitBtn)`
+   - Submit data with error handling
+   - Reset button: `resetButton(submitBtn)`
+   - Show message: `showMessage('formname-message', success, message)`
+5. Add audit listing in `audit.js`
+6. Add date input initialization in `utils.js` if needed
+7. Run `./build-js.py` to regenerate production HTML
+
+**Adding visual feedback to existing form:**
+1. Locate form submission handler in `forms.js`
+2. Add button state management:
+   ```javascript
+   const submitBtn = e.target.querySelector('button[type="submit"]');
+   setButtonLoading(submitBtn);
+   // ... existing logic ...
+   resetButton(submitBtn);
+   ```
+3. Ensure error handling includes button reset
+4. Use `showMessage()` for all success/error feedback
+
+**Adding dynamic items (like supplements):**
+1. Create container in HTML: `<div id="items-container"></div>`
+2. Add functions in `dynamic-items.js`:
+   - `addItem()` - Create new item with remove button
+   - `updateRemoveButtons()` - Show/hide based on rules
+   - `renumberItems()` - Update labels after removal
+3. Attach event listeners in `initializeDynamicItems()`
+4. For optional items: always show remove button
+5. For required items: hide when count = 1
 
 ---
 
@@ -422,6 +634,46 @@ MTLS_ENABLED=true PORT=8443 python3 server.py
 - ADRR: 0-25 (green), 25-50 (yellow), >50 (red)
 
 **Note:** These values are adjusted from human clinical thresholds based on feline glucose metabolism research and veterinary guidelines.
+
+## UI Feedback Design
+
+**Why shake animation for errors?**
+- Human attention drawn to motion - makes errors impossible to miss
+- Horizontal shake is universally recognized as "no/error"
+- Short duration (0.4s) doesn't feel distracting
+- Combined with color/icon for redundant signaling
+
+**Why longer timeout for errors (8s vs 5s)?**
+- Error messages often contain technical details needing reading time
+- Users need time to understand what went wrong
+- Success messages are simple and need less reading time
+- 60% increase (3 seconds) is perceptually significant
+
+**Why disable button during submission?**
+- Prevents double-submission (critical for data integrity)
+- Clear visual feedback that action is in progress
+- Matches user expectations from modern web apps
+- Gray color universally understood as "inactive"
+
+**Why use icons (✓/✖)?**
+- Language-agnostic communication
+- Instant recognition without reading text
+- Adds visual weight to messages
+- Improves accessibility (redundant signaling)
+
+**Why CSS animations over JavaScript?**
+- Better performance (GPU accelerated)
+- Smoother 60fps animations
+- Less CPU usage
+- Declarative and easier to maintain
+- Works even if JavaScript is slow/blocked
+
+**Why pseudo-elements for icons?**
+- No additional HTML elements needed
+- Automatic styling inheritance
+- Easy to override per message type
+- Cleaner markup separation
+- Unicode icons work everywhere
 
 ---
 
@@ -540,6 +792,41 @@ sqlite3 glucose.db "EXPLAIN QUERY PLAN SELECT * FROM glucose WHERE timestamp BET
 # Analyze database
 sqlite3 glucose.db "ANALYZE;"
 ```
+
+---
+
+# Version History
+
+## v0.7.0 (2026-02-28)
+
+**UI/UX Enhancements:**
+- Enhanced error message visual feedback with shake animation
+- Added success/error icons (✓/✖) to messages
+- Implemented submit button loading states with spinner
+- Extended error message display from 5s to 8s
+- Added smooth fade-in/fade-out transitions
+- Prevented double-submission through button disabling
+- Improved message styling with shadows and thicker borders
+
+**Feature Updates:**
+- Allow removing all supplement items in intake form (supplements now optional)
+- Added event listener for initial supplement remove button
+
+**Technical Changes:**
+- New utility functions: `setButtonLoading()`, `resetButton()`
+- Enhanced `showMessage()` with animation triggers and variable timeouts
+- Updated all form handlers with loading state management
+- CSS animations: shake (errors), spinner (buttons), fade transitions
+- Production bundle rebuilt with enhanced functionality
+
+**Files Modified:**
+- `static/css/styles.css` - Added animations and enhanced message styles
+- `static/js/utils.js` - Enhanced message display and button state functions
+- `static/js/forms.js` - Added loading states to all form handlers
+- `static/js/dynamic-items.js` - Allow removing all supplement items
+- `static/index.html.dev` - Show initial supplement remove button
+- `static/index.html` - Production HTML regenerated
+- `static/js/release/app.min.js` - Production bundle (38.89 KB)
 
 ---
 

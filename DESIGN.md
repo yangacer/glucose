@@ -122,6 +122,7 @@ Tabbed interface with the following sections:
 
 **Features:**
 - Dynamic add/remove for nutrition and supplement items
+- All supplement items can be removed (optional supplements)
 - Auto-fill from previous time window (12-hour periods)
 - Separate audit lists for nutrition and supplements
 - Edit and delete existing records
@@ -382,6 +383,18 @@ Click outside overlay to dismiss.
 - Default to current time for all timestamps
 - Quick "Reset to Now" buttons
 - Remember previous entries for faster input
+- Visual feedback during form submission
+- Submit button loading states prevent double-submission
+
+### User Feedback
+- Enhanced error messages with icons and animations
+- Success messages with checkmark icons
+- Error messages shake horizontally to attract attention
+- Longer display time for errors (8s) vs success (5s)
+- Submit buttons show "Submitting..." with spinner animation
+- Buttons disabled during API calls to prevent double-submission
+- Smooth fade-in/fade-out transitions for all messages
+- Clear visual distinction between success and error states
 
 ### Visualizations
 - Consistent color scheme across charts
@@ -415,6 +428,56 @@ Click outside overlay to dismiss.
 - Risk metrics adjusted for cats' tolerance to higher glucose
 - Normal range: 70-150 mg/dL (vs human 70-100 mg/dL)
 - Diabetic target: 100-250 mg/dL (vs human 80-130 mg/dL)
+
+---
+
+## User Experience Details
+
+### Form Submission Feedback
+
+**Visual States:**
+
+| State | Button | Message | Duration |
+|-------|--------|---------|----------|
+| Idle | "Submit" - Enabled | None | - |
+| Submitting | "Submitting..." - Disabled with spinner | None | Until response |
+| Success | "Submit" - Enabled | ✓ Success message (green) | 5 seconds |
+| Error | "Submit" - Enabled | ✖ Error message (red, shakes) | 8 seconds |
+
+**Error Message Design:**
+- Icon: ✖ (cross mark)
+- Background: Light red
+- Text: Dark red, bold
+- Border: Thick solid red border
+- Shadow: Prominent shadow for depth
+- Animation: Horizontal shake to attract attention
+- Fade-in: Smooth slide down transition
+- Display time: 8 seconds
+
+**Success Message Design:**
+- Icon: ✓ (checkmark)
+- Background: Light green
+- Text: Dark green, bold
+- Border: Solid green border
+- Shadow: Subtle shadow for depth
+- Animation: Smooth slide down fade-in (no shake)
+- Display time: 5 seconds
+
+**Button Loading State:**
+- Text changes to "Submitting..."
+- Button grays out and becomes disabled
+- Cursor indicates waiting
+- Animated spinner appears
+- Prevents double-submission
+- Original state restored after response
+
+**Benefits:**
+- **Immediate attention:** Shake animation makes errors impossible to miss
+- **Clear status:** Icons and colors provide instant understanding
+- **Prevented errors:** Button disabling stops accidental double-submissions
+- **Better readability:** Bold text and longer display time for errors
+- **Professional feel:** Smooth animations enhance user experience
+- **Accessibility:** High contrast and clear visual indicators
 
 ---
 

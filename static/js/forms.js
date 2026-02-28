@@ -7,6 +7,9 @@ function initializeForms() {
     // Glucose form
     document.getElementById('glucoseForm').addEventListener('submit', async (e) => {
         e.preventDefault();
+        const submitBtn = e.target.querySelector('button[type="submit"]');
+        setButtonLoading(submitBtn);
+        
         const formData = new FormData(e.target);
         const data = {
             timestamp: toDbTimestamp(formData.get('timestamp')),
@@ -14,6 +17,7 @@ function initializeForms() {
         };
         
         const result = await submitData('/glucose', data);
+        resetButton(submitBtn);
         showMessage('glucose-message', result.success, result.message);
         if (result.success) {
             e.target.reset();
@@ -24,6 +28,9 @@ function initializeForms() {
     // Insulin form
     document.getElementById('insulinForm').addEventListener('submit', async (e) => {
         e.preventDefault();
+        const submitBtn = e.target.querySelector('button[type="submit"]');
+        setButtonLoading(submitBtn);
+        
         const formData = new FormData(e.target);
         const data = {
             timestamp: toDbTimestamp(formData.get('timestamp')),
@@ -31,6 +38,7 @@ function initializeForms() {
         };
         
         const result = await submitData('/insulin', data);
+        resetButton(submitBtn);
         showMessage('insulin-message', result.success, result.message);
         if (result.success) {
             e.target.reset();
@@ -44,6 +52,9 @@ function initializeForms() {
     // Supplements form
     document.getElementById('supplementsForm').addEventListener('submit', async (e) => {
         e.preventDefault();
+        const submitBtn = e.target.querySelector('button[type="submit"]');
+        setButtonLoading(submitBtn);
+        
         const formData = new FormData(e.target);
         const data = {
             supplement_name: formData.get('supplement_name'),
@@ -51,6 +62,7 @@ function initializeForms() {
         };
         
         const result = await submitData('/supplements', data);
+        resetButton(submitBtn);
         showMessage('supplements-message', result.success, result.message);
         if (result.success) {
             e.target.reset();
@@ -62,6 +74,9 @@ function initializeForms() {
     // Event form
     document.getElementById('eventForm').addEventListener('submit', async (e) => {
         e.preventDefault();
+        const submitBtn = e.target.querySelector('button[type="submit"]');
+        setButtonLoading(submitBtn);
+        
         const formData = new FormData(e.target);
         const data = {
             timestamp: toDbTimestamp(formData.get('timestamp')),
@@ -70,6 +85,7 @@ function initializeForms() {
         };
         
         const result = await submitData('/event', data);
+        resetButton(submitBtn);
         showMessage('event-message', result.success, result.message);
         if (result.success) {
             e.target.reset();
@@ -80,6 +96,9 @@ function initializeForms() {
     // Nutrition form
     document.getElementById('nutritionForm').addEventListener('submit', async (e) => {
         e.preventDefault();
+        const submitBtn = e.target.querySelector('button[type="submit"]');
+        setButtonLoading(submitBtn);
+        
         const formData = new FormData(e.target);
         const data = {
             nutrition_name: formData.get('nutrition_name'),
@@ -88,6 +107,7 @@ function initializeForms() {
         };
         
         const result = await submitData('/nutrition', data);
+        resetButton(submitBtn);
         showMessage('nutrition-message', result.success, result.message);
         if (result.success) {
             e.target.reset();
@@ -102,6 +122,9 @@ function initializeForms() {
  */
 async function handleIntakeSubmit(e) {
     e.preventDefault();
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+    setButtonLoading(submitBtn);
+    
     const formData = new FormData(e.target);
     const timestamp = toDbTimestamp(formData.get('timestamp'));
     
@@ -112,6 +135,7 @@ async function handleIntakeSubmit(e) {
         const nutritionAmount = formData.get('nutrition_amount[]');
         
         if (!nutritionId) {
+            resetButton(submitBtn);
             showMessage('intake-message', false, 'Please select a nutrition item');
             return;
         }
@@ -129,6 +153,7 @@ async function handleIntakeSubmit(e) {
                 body: JSON.stringify(data)
             });
             
+            resetButton(submitBtn);
             if (response.ok) {
                 showMessage('intake-message', true, 'Record updated successfully!');
                 cancelIntakeEdit();
@@ -138,6 +163,7 @@ async function handleIntakeSubmit(e) {
                 showMessage('intake-message', false, error.error || 'Update failed');
             }
         } catch (err) {
+            resetButton(submitBtn);
             showMessage('intake-message', false, 'Network error: ' + err.message);
         }
         return;
@@ -186,6 +212,7 @@ async function handleIntakeSubmit(e) {
         }
     }
     
+    resetButton(submitBtn);
     if (allSuccess) {
         const totalItems = nutritionIds.filter(id => id).length + supplementIds.filter(id => id).length;
         showMessage('intake-message', true, `Successfully submitted ${totalItems} item(s)!`);

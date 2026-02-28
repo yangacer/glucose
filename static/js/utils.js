@@ -26,19 +26,33 @@ async function submitData(endpoint, data) {
 }
 
 /**
- * Show message to user
+ * Show message to user with improved visual feedback
  * @param {string} elementId - ID of message element
  * @param {boolean} success - Whether operation was successful
  * @param {string} message - Message to display
  */
 function showMessage(elementId, success, message) {
     const msgEl = document.getElementById(elementId);
+    
+    // Clear previous classes and content
+    msgEl.className = 'message';
     msgEl.textContent = message;
-    msgEl.className = 'message ' + (success ? 'success' : 'error');
+    
+    // Add success or error class
+    msgEl.classList.add(success ? 'success' : 'error');
+    
+    // Trigger animation
+    setTimeout(() => msgEl.classList.add('show'), 10);
+    
+    // Clear message after timeout (longer for errors)
+    const timeout = success ? 5000 : 8000;
     setTimeout(() => {
-        msgEl.textContent = '';
-        msgEl.className = 'message';
-    }, 5000);
+        msgEl.classList.remove('show');
+        setTimeout(() => {
+            msgEl.textContent = '';
+            msgEl.className = 'message';
+        }, 300);
+    }, timeout);
 }
 
 /**
@@ -113,6 +127,31 @@ function resetToNow(inputId) {
         const timestamp = getCurrentTimestamp();
         input.value = timestamp;
     }
+}
+
+/**
+ * Set button to loading state
+ * @param {HTMLButtonElement} button - Button element
+ * @param {string} loadingText - Optional loading text
+ */
+function setButtonLoading(button, loadingText = 'Submitting...') {
+    button.dataset.originalText = button.textContent;
+    button.textContent = loadingText;
+    button.disabled = true;
+    button.classList.add('submitting');
+}
+
+/**
+ * Reset button from loading state
+ * @param {HTMLButtonElement} button - Button element
+ */
+function resetButton(button) {
+    if (button.dataset.originalText) {
+        button.textContent = button.dataset.originalText;
+        delete button.dataset.originalText;
+    }
+    button.disabled = false;
+    button.classList.remove('submitting');
 }
 
 /**
