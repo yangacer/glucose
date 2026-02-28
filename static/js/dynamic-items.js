@@ -12,6 +12,17 @@ function initializeDynamicItems() {
     
     // Add supplement item button
     document.getElementById('add-supplement-btn').addEventListener('click', addSupplementItem);
+    
+    // Initialize remove button for initial supplement item
+    const initialSupplementRemoveBtn = document.querySelector('#supplement-items-container .remove-supplement-btn');
+    if (initialSupplementRemoveBtn) {
+        initialSupplementRemoveBtn.addEventListener('click', function() {
+            const item = this.closest('.supplement-item');
+            item.remove();
+            updateSupplementRemoveButtons();
+            renumberSupplementItems();
+        });
+    }
 }
 
 /**
@@ -92,7 +103,7 @@ function updateSupplementRemoveButtons() {
     const items = document.querySelectorAll('#supplement-items-container .supplement-item');
     items.forEach(item => {
         const removeBtn = item.querySelector('.remove-supplement-btn');
-        removeBtn.style.display = items.length > 1 ? 'inline-block' : 'none';
+        removeBtn.style.display = 'inline-block';
     });
 }
 

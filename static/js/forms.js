@@ -229,7 +229,7 @@ function resetIntakeForm() {
                 </select>
             </label>
             <label>Amount: <input type="number" name="supplement_amount[]" required min="0" step="0.1"></label>
-            <button type="button" class="remove-supplement-btn" style="display:none;">Remove</button>
+            <button type="button" class="remove-supplement-btn">Remove</button>
         </div>
     `;
     
