@@ -624,6 +624,33 @@ class TestGlucoseAPI(unittest.TestCase):
         self.assertIsInstance(data['lbgi_7d_12h'], list)
         self.assertIsInstance(data['hbgi_7d_12h'], list)
         self.assertIsInstance(data['adrr_7d_12h'], list)
+    
+    def test_28_prediction_api(self):
+        """Test prediction API endpoint"""
+        status, data = self.make_request('GET', '/api/dashboard/prediction?lookback_days=14')
+        self.assertEqual(status, 200)
+        
+        # Check required fields
+        self.assertIn('next_window', data)
+        self.assertIn('prediction', data)
+        self.assertIn('basis', data)
+        self.assertIn('warnings', data)
+        
+        # Check basis structure
+        self.assertIn('data_points', data['basis'])
+        self.assertIn('lookback_days', data['basis'])
+        
+        # If sufficient data, check prediction structure
+        if data['prediction'] is not None:
+            self.assertIn('glucose', data['prediction'])
+            self.assertIn('glucose_range', data['prediction'])
+            self.assertIn('confidence', data['prediction'])
+            self.assertIn(data['prediction']['confidence'], ['High', 'Medium', 'Low'])
+            self.assertIsInstance(data['prediction']['glucose_range'], list)
+            self.assertEqual(len(data['prediction']['glucose_range']), 2)
+        
+        # Check warnings is a list
+        self.assertIsInstance(data['warnings'], list)
 
 
 if __name__ == '__main__':

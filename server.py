@@ -5,6 +5,7 @@ import socketserver
 import json
 import sqlite3
 import urllib.parse
+import math
 from datetime import datetime, date, timedelta
 from contextlib import contextmanager
 import os
@@ -650,6 +651,224 @@ def get_glucose_levels_around_intake(cursor, first_intake_time, intake_dt):
     return glucose_levels
 
 
+def predict_next_window(lookback_days=14):
+    """
+    Predict next glucose level and insulin dose using statistical baseline.
+    
+    Args:
+        lookback_days: Number of days of historical data to use (default: 14)
+    
+    Returns:
+        dict: Prediction results with glucose, insulin, confidence, and warnings
+    """
+    # Calculate lookback start time
+    now = datetime.now()
+    lookback_start = (now - timedelta(days=lookback_days)).strftime('%Y-%m-%d %H:%M:%S')
+    
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        
+        # Fetch historical glucose data
+        cursor.execute('''
+            SELECT timestamp, level 
+            FROM glucose 
+            WHERE timestamp >= ? 
+            ORDER BY timestamp DESC
+        ''', (lookback_start,))
+        glucose_data = cursor.fetchall()
+        
+        # Fetch historical insulin data
+        cursor.execute('''
+            SELECT timestamp, level 
+            FROM insulin 
+            WHERE timestamp >= ? 
+            ORDER BY timestamp DESC
+        ''', (lookback_start,))
+        insulin_data = cursor.fetchall()
+        
+        # Fetch recent intake data (last 7 days for calorie context)
+        intake_start = (now - timedelta(days=7)).strftime('%Y-%m-%d %H:%M:%S')
+        cursor.execute('''
+            SELECT i.timestamp, n.kcal * i.nutrition_amount / n.weight as calories
+            FROM intake i
+            JOIN nutrition n ON i.nutrition_id = n.id
+            WHERE i.timestamp >= ?
+            ORDER BY i.timestamp DESC
+        ''', (intake_start,))
+        intake_data = cursor.fetchall()
+    
+    # Data quality checks
+    warnings = []
+    if len(glucose_data) < 10:
+        warnings.append("Insufficient data: Less than 10 glucose readings available")
+        return {
+            'next_window': _get_next_window_name(now),
+            'prediction': None,
+            'basis': {
+                'data_points': len(glucose_data),
+                'lookback_days': lookback_days
+            },
+            'warnings': warnings + ["Cannot generate prediction with insufficient data"],
+            'error': 'insufficient_data'
+        }
+    
+    # 1. Calculate predicted glucose using time-weighted mean of recent data
+    # Use last 24 hours of data for prediction
+    recent_cutoff = (now - timedelta(hours=24)).strftime('%Y-%m-%d %H:%M:%S')
+    recent_glucose = [(row[0], row[1]) for row in glucose_data if row[0] >= recent_cutoff]
+    
+    if len(recent_glucose) < 2:
+        # Fall back to last 2 readings if insufficient recent data
+        recent_glucose = glucose_data[:2]
+    
+    # Convert timestamp strings to datetime objects and reverse to chronological order
+    # (glucose_data is DESC, but time-weighted mean needs ascending time)
+    recent_glucose_parsed = [
+        (datetime.strptime(ts, '%Y-%m-%d %H:%M:%S'), level) 
+        for ts, level in reversed(recent_glucose)
+    ]
+    predicted_glucose = calculate_time_weighted_mean(recent_glucose_parsed)
+    
+    # Check if time-weighted mean failed (can happen if all timestamps are identical)
+    if predicted_glucose is None:
+        # Use simple average of recent glucose values as fallback
+        predicted_glucose = sum(row[1] for row in recent_glucose) / len(recent_glucose)
+        warnings.append("Using simple average (insufficient time spread in data)")
+    
+    # Calculate glucose statistics for full dataset
+    all_glucose_values = [row[1] for row in glucose_data]
+    avg_glucose = sum(all_glucose_values) / len(all_glucose_values)
+    glucose_std = math.sqrt(sum((x - avg_glucose) ** 2 for x in all_glucose_values) / len(all_glucose_values))
+    
+    # Calculate CV for confidence assessment
+    cv = (glucose_std / avg_glucose * 100) if avg_glucose > 0 else 100
+    
+    # Calculate uncertainty range (±1 std dev)
+    glucose_range = [
+        max(40, predicted_glucose - glucose_std),
+        min(500, predicted_glucose + glucose_std)
+    ]
+    
+    # 2. Calculate insulin recommendation
+    if len(insulin_data) > 0:
+        # Calculate insulin-to-glucose ratio
+        # Pair each insulin dose with nearest glucose reading
+        insulin_glucose_pairs = []
+        for insulin_ts, insulin_level in insulin_data:
+            insulin_time = datetime.strptime(insulin_ts, '%Y-%m-%d %H:%M:%S')
+            
+            # Find closest glucose reading within 2 hours
+            for glucose_ts, glucose_level in glucose_data:
+                glucose_time = datetime.strptime(glucose_ts, '%Y-%m-%d %H:%M:%S')
+                time_diff = abs((insulin_time - glucose_time).total_seconds())
+                
+                if time_diff <= 7200:  # 2 hours
+                    insulin_glucose_pairs.append((insulin_level, glucose_level))
+                    break
+        
+        if insulin_glucose_pairs:
+            # Calculate average ratio
+            ratios = [insulin / glucose for insulin, glucose in insulin_glucose_pairs if glucose > 0]
+            avg_ratio = sum(ratios) / len(ratios) if ratios else 0
+            
+            # Apply ratio to predicted glucose
+            recommended_insulin = predicted_glucose * avg_ratio
+            
+            # Adjust for recent calorie intake (last 24 hours)
+            if len(intake_data) > 0:
+                recent_calories = sum(row[1] for row in intake_data[:5] if row[1])  # Last 5 meals
+                avg_calories = recent_calories / min(5, len(intake_data))
+                
+                # If calories are high (>100 kcal), slightly increase insulin (up to 10%)
+                if avg_calories > 100:
+                    calorie_factor = min(1.1, 1 + (avg_calories - 100) / 1000)
+                    recommended_insulin *= calorie_factor
+            
+            # Apply safety bounds
+            max_insulin = max([row[1] for row in insulin_data]) * 1.5 if insulin_data else 2.0
+            recommended_insulin = max(0, min(recommended_insulin, max_insulin))
+            
+            avg_insulin = sum(row[1] for row in insulin_data) / len(insulin_data)
+        else:
+            # No valid insulin-glucose pairs found
+            warnings.append("Unable to calculate insulin recommendation: No paired data")
+            recommended_insulin = None
+            avg_insulin = None
+    else:
+        warnings.append("No insulin data available for recommendation")
+        recommended_insulin = None
+        avg_insulin = None
+    
+    # 3. Assess confidence level
+    confidence = _calculate_confidence(len(glucose_data), cv, glucose_std, all_glucose_values)
+    
+    # 4. Generate warnings
+    if cv > 35:
+        warnings.append("High glucose variability detected (CV > 35%)")
+    
+    if predicted_glucose < 60:
+        warnings.append("⚠️ ALERT: Predicted hypoglycemia risk (< 60 mg/dL)")
+    elif predicted_glucose > 400:
+        warnings.append("⚠️ ALERT: Predicted hyperglycemia risk (> 400 mg/dL)")
+    
+    # Check for unusual patterns (>2 std dev from mean)
+    if abs(predicted_glucose - avg_glucose) > 2 * glucose_std:
+        warnings.append("Unusual pattern detected - prediction differs significantly from historical average")
+    
+    if not warnings:
+        warnings.append("Monitor closely and adjust as needed")
+    
+    return {
+        'next_window': _get_next_window_name(now),
+        'prediction': {
+            'glucose': round(predicted_glucose, 1),
+            'glucose_range': [round(glucose_range[0], 1), round(glucose_range[1], 1)],
+            'insulin_recommended': round(recommended_insulin, 2) if recommended_insulin else None,
+            'confidence': confidence
+        },
+        'basis': {
+            'data_points': len(glucose_data),
+            'lookback_days': lookback_days,
+            'recent_cv': round(cv, 1),
+            'avg_glucose': round(avg_glucose, 1),
+            'avg_insulin': round(avg_insulin, 2) if avg_insulin else None
+        },
+        'warnings': warnings
+    }
+
+
+def _get_next_window_name(current_time):
+    """Determine the name of the next time window."""
+    hour = current_time.hour
+    
+    # Day window: 05:00-16:59, Night window: 17:00-04:59
+    if 5 <= hour < 17:
+        # Currently in day window, next is night
+        return "Night (17:00-04:59)"
+    else:
+        # Currently in night window, next is day
+        return "Day (05:00-16:59)"
+
+
+def _calculate_confidence(data_points, cv, std_dev, values):
+    """Calculate confidence level for prediction."""
+    # Check for stable recent trend (last 5 readings)
+    if len(values) >= 5:
+        recent = values[:5]
+        recent_std = math.sqrt(sum((x - sum(recent)/len(recent)) ** 2 for x in recent) / len(recent))
+        stable_trend = recent_std < std_dev * 0.8
+    else:
+        stable_trend = False
+    
+    # Confidence criteria
+    if cv < 25 and data_points >= 30 and stable_trend:
+        return "High"
+    elif cv < 35 and data_points >= 14:
+        return "Medium"
+    else:
+        return "Low"
+
+
 # ============================================================================
 # Data Access Layer - CRUD Operations
 # ============================================================================
@@ -859,6 +1078,7 @@ class GlucoseHandler(http.server.SimpleHTTPRequestHandler):
                 '/api/dashboard/summary': lambda: self.handle_get_summary(query_params),
                 '/api/dashboard/cv-charts': lambda: self.handle_get_cv_charts(query_params),
                 '/api/dashboard/risk-metrics': lambda: self.handle_get_risk_metrics(query_params),
+                '/api/dashboard/prediction': lambda: self.handle_get_prediction(query_params),
             }
             
             if path in route_handlers:
@@ -1226,6 +1446,22 @@ class GlucoseHandler(http.server.SimpleHTTPRequestHandler):
             'adrr_30d_48h': adrr_30d_48h,
             'adrr_30d_5d': adrr_30d_5d
         })
+    
+    def handle_get_prediction(self, query_params):
+        """Handle GET /api/dashboard/prediction - Get glucose and insulin prediction."""
+        lookback_days = int(query_params.get('lookback_days', [14])[0])
+        
+        try:
+            result = predict_next_window(lookback_days)
+            self._send_json(result)
+        except Exception as e:
+            import traceback
+            traceback.print_exc()  # Print to console
+            self._send_json({
+                'error': 'prediction_failed',
+                'message': str(e),
+                'warnings': ['Unable to generate prediction due to error']
+            }, status=500)
 
 
 # ============================================================================

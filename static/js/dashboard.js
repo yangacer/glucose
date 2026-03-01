@@ -48,6 +48,7 @@ async function loadDashboard() {
     loadNutritionList();
     loadCVCharts();
     loadRiskMetrics();
+    loadPrediction();
 }
 
 /**
@@ -528,5 +529,132 @@ function renderRiskChart(canvasId, data, chartInstance, metricName, thresholds, 
         adrrChart30d48h = chart;
     } else if (canvasId === 'adrrChart30d5d') {
         adrrChart30d5d = chart;
+    }
+}
+
+/**
+ * Load and display glucose/insulin prediction
+ */
+async function loadPrediction() {
+    const container = document.getElementById('predictionContent');
+    
+    try {
+        const response = await fetch(`${API_BASE}/dashboard/prediction?lookback_days=14`);
+        
+        if (!response.ok) {
+            throw new Error('Failed to fetch prediction');
+        }
+        
+        const data = await response.json();
+        
+        if (data.error) {
+            displayPredictionError(container, data);
+            return;
+        }
+        
+        displayPrediction(container, data);
+    } catch (error) {
+        console.error('Error loading prediction:', error);
+        container.innerHTML = `
+            <div class="prediction-error">
+                <p><strong>Unable to load prediction</strong></p>
+                <p>${error.message}</p>
+            </div>
+        `;
+    }
+}
+
+/**
+ * Display prediction data
+ */
+function displayPrediction(container, data) {
+    const { prediction, next_window, basis, warnings } = data;
+    
+    if (!prediction) {
+        displayPredictionError(container, data);
+        return;
+    }
+    
+    const confidenceClass = `confidence-${prediction.confidence.toLowerCase()}`;
+    const confidenceDots = getConfidenceDots(prediction.confidence);
+    
+    let html = `
+        <div class="prediction-box">
+            <div class="prediction-item">
+                <h3>📊 Predicted Glucose</h3>
+                <div class="prediction-value">${prediction.glucose} mg/dL</div>
+                <div class="prediction-range">Range: ${prediction.glucose_range[0]} - ${prediction.glucose_range[1]} mg/dL</div>
+            </div>
+            <div class="prediction-item">
+                <h3>💉 Recommended Insulin</h3>
+                <div class="prediction-value">
+                    ${prediction.insulin_recommended !== null ? prediction.insulin_recommended + ' units' : 'N/A'}
+                </div>
+                ${prediction.insulin_recommended === null ? '<div class="prediction-range">Insufficient data</div>' : ''}
+            </div>
+        </div>
+        
+        <div class="prediction-confidence">
+            <div>Time Window: <strong>${next_window}</strong></div>
+            <div class="confidence-level ${confidenceClass}">
+                Confidence: ${prediction.confidence}
+            </div>
+            <div class="confidence-dots">${confidenceDots}</div>
+        </div>
+        
+        <div class="prediction-basis">
+            Based on ${basis.data_points} glucose readings over ${basis.lookback_days} days
+            ${basis.recent_cv !== null ? `(CV: ${basis.recent_cv}%)` : ''}
+        </div>
+    `;
+    
+    if (warnings && warnings.length > 0) {
+        html += `
+            <div class="prediction-warnings">
+                <h4>⚠️ Warnings</h4>
+                <ul>
+                    ${warnings.map(w => `<li>${escapeHtml(w)}</li>`).join('')}
+                </ul>
+            </div>
+        `;
+    }
+    
+    html += `
+        <div class="prediction-disclaimer">
+            This prediction is for informational purposes only. Always verify with actual glucose readings and consult your veterinarian for dosing decisions.
+        </div>
+    `;
+    
+    container.innerHTML = html;
+}
+
+/**
+ * Display prediction error
+ */
+function displayPredictionError(container, data) {
+    const warnings = data.warnings || ['Unable to generate prediction'];
+    
+    container.innerHTML = `
+        <div class="prediction-error">
+            <p><strong>Cannot Generate Prediction</strong></p>
+            <p>${warnings.join('. ')}</p>
+            ${data.basis ? `<p style="margin-top:10px; font-size:0.9em;">Data points available: ${data.basis.data_points}</p>` : ''}
+        </div>
+    `;
+}
+
+/**
+ * Get confidence dots visualization
+ */
+function getConfidenceDots(confidence) {
+    switch(confidence) {
+        case 'High':
+            return '●●●●●';
+        case 'Medium':
+            return '●●●○○';
+        case 'Low':
+            return '●○○○○';
+        default:
+            return '○○○○○';
     }
 }
