@@ -42,7 +42,7 @@ def execute_query(query, params=(), fetch_one=False, commit=False):
     with get_db_connection() as conn:
         cursor = conn.cursor()
         cursor.execute(query, params)
-        
+
         if commit:
             conn.commit()
             result = True
@@ -50,7 +50,7 @@ def execute_query(query, params=(), fetch_one=False, commit=False):
             result = cursor.fetchone()
         else:
             result = cursor.fetchall()
-        
+
         return result
 
 
@@ -62,10 +62,10 @@ def calculate_time_weighted_mean(data):
     """Calculate time-weighted mean using trapezoidal rule."""
     if len(data) < 2:
         return None
-    
+
     total_area = 0.0
     total_time = 0.0
-    
+
     for i in range(1, len(data)):
         t0, v0 = data[i-1]
         t1, v1 = data[i]
@@ -73,7 +73,7 @@ def calculate_time_weighted_mean(data):
         area = (v0 + v1) / 2.0 * delta_t
         total_area += area
         total_time += delta_t
-    
+
     return total_area / total_time if total_time > 0 else None
 
 
@@ -81,7 +81,7 @@ def calculate_standard_deviation(data):
     """Calculate standard deviation of glucose values."""
     if len(data) < 2:
         return None
-    
+
     values = [v for _, v in data]
     mean = sum(values) / len(values)
     variance = sum((v - mean) ** 2 for v in values) / len(values)
@@ -92,41 +92,41 @@ def calculate_cv(data):
     """Calculate coefficient of variation (CV) as percentage."""
     if len(data) < 2:
         return None
-    
+
     time_weighted_mean = calculate_time_weighted_mean(data)
     if time_weighted_mean is None or time_weighted_mean == 0:
         return None
-    
+
     std_dev = calculate_standard_deviation(data)
     if std_dev is None:
         return None
-    
+
     return (std_dev / time_weighted_mean) * 100
 
 
 def generate_cv_windows(end_date, days, window_hours):
     """Generate time windows for CV calculation.
-    
+
     Args:
         end_date: End date (datetime.date)
         days: Number of days to look back
         window_hours: Window size in hours (12, 48, or 120)
-    
+
     Returns:
         List of (window_label, window_start, window_end) tuples
     """
     windows = []
     anchor_time = datetime.combine(end_date, datetime.min.time()) + timedelta(hours=5)
-    
+
     current_window_end = anchor_time
-    
+
     while True:
         window_start = current_window_end - timedelta(hours=window_hours)
-        
+
         days_back = (anchor_time - window_start).total_seconds() / 86400
         if days_back > days:
             break
-        
+
         if window_hours == 12:
             if window_start.hour == 5:
                 label = f"{window_start.strftime('%Y-%m-%d')} Day"
@@ -136,52 +136,52 @@ def generate_cv_windows(end_date, days, window_hours):
             label = f"{window_start.strftime('%Y-%m-%d')} to {current_window_end.strftime('%Y-%m-%d')}"
         else:
             label = f"{window_start.strftime('%Y-%m-%d')} to {current_window_end.strftime('%Y-%m-%d')}"
-        
+
         windows.append((
             label,
             window_start.strftime('%Y-%m-%d %H:%M:%S'),
             current_window_end.strftime('%Y-%m-%d %H:%M:%S')
         ))
-        
+
         current_window_end = window_start
-    
+
     return list(reversed(windows))
 
 
 def calculate_cv_data(glucose_rows, windows):
     """Calculate CV for each time window.
-    
+
     Args:
         glucose_rows: List of (timestamp_str, level) tuples
         windows: List of (label, start, end) tuples
-    
+
     Returns:
         List of {'label': str, 'cv': float} dicts
     """
     result = []
-    
+
     for label, window_start, window_end in windows:
         window_data = []
         for timestamp_str, level in glucose_rows:
             if window_start <= timestamp_str <= window_end:
                 dt = datetime.strptime(timestamp_str, '%Y-%m-%d %H:%M:%S')
                 window_data.append((dt, level))
-        
+
         cv = calculate_cv(window_data)
         result.append({
             'label': label,
             'cv': round(cv, 2) if cv is not None else None
         })
-    
+
     return result
 
 
 def calculate_risk_function(glucose_mg_dl):
     """Calculate risk function f(G) for LBGI/HBGI.
-    
+
     Args:
         glucose_mg_dl: Glucose level in mg/dL
-    
+
     Returns:
         Risk function value
     """
@@ -191,16 +191,16 @@ def calculate_risk_function(glucose_mg_dl):
 
 def calculate_lbgi(data):
     """Calculate Low Blood Glucose Index (LBGI).
-    
+
     Args:
         data: List of (timestamp, glucose_level) tuples
-    
+
     Returns:
         LBGI value or None if insufficient data
     """
     if len(data) < 1:
         return None
-    
+
     low_risks = []
     for _, glucose in data:
         f_g = calculate_risk_function(glucose)
@@ -209,22 +209,22 @@ def calculate_lbgi(data):
             low_risks.append(rl)
         else:
             low_risks.append(0)
-    
+
     return sum(low_risks) / len(low_risks) if low_risks else None
 
 
 def calculate_hbgi(data):
     """Calculate High Blood Glucose Index (HBGI).
-    
+
     Args:
         data: List of (timestamp, glucose_level) tuples
-    
+
     Returns:
         HBGI value or None if insufficient data
     """
     if len(data) < 1:
         return None
-    
+
     high_risks = []
     for _, glucose in data:
         f_g = calculate_risk_function(glucose)
@@ -233,33 +233,33 @@ def calculate_hbgi(data):
             high_risks.append(rh)
         else:
             high_risks.append(0)
-    
+
     return sum(high_risks) / len(high_risks) if high_risks else None
 
 
 def calculate_adrr(glucose_rows, windows):
     """Calculate Average Daily Risk Range (ADRR).
-    
+
     Groups data by calendar days, calculates LBGI + HBGI for each day,
     then averages the daily risk ranges.
-    
+
     Args:
         glucose_rows: List of (timestamp_str, level) tuples
         windows: List of (label, start, end) tuples
-    
+
     Returns:
         ADRR value or None if insufficient data
     """
     if not glucose_rows:
         return None
-    
+
     # Group by calendar date
     daily_data = defaultdict(list)
     for timestamp_str, level in glucose_rows:
         dt = datetime.strptime(timestamp_str, '%Y-%m-%d %H:%M:%S')
         date_key = dt.date()
         daily_data[date_key].append((dt, level))
-    
+
     # Calculate daily risk range for each day
     daily_rr = []
     for date_key in sorted(daily_data.keys()):
@@ -269,66 +269,66 @@ def calculate_adrr(glucose_rows, windows):
             hbgi = calculate_hbgi(day_data)
             if lbgi is not None and hbgi is not None:
                 daily_rr.append(lbgi + hbgi)
-    
+
     return sum(daily_rr) / len(daily_rr) if daily_rr else None
 
 
 def calculate_risk_metric_data(glucose_rows, windows, metric_type):
     """Calculate LBGI or HBGI for each time window.
-    
+
     Args:
         glucose_rows: List of (timestamp_str, level) tuples
         windows: List of (label, start, end) tuples
         metric_type: 'lbgi' or 'hbgi'
-    
+
     Returns:
         List of {'label': str, 'value': float} dicts
     """
     result = []
     calc_func = calculate_lbgi if metric_type == 'lbgi' else calculate_hbgi
-    
+
     for label, window_start, window_end in windows:
         window_data = []
         for timestamp_str, level in glucose_rows:
             if window_start <= timestamp_str <= window_end:
                 dt = datetime.strptime(timestamp_str, '%Y-%m-%d %H:%M:%S')
                 window_data.append((dt, level))
-        
+
         value = calc_func(window_data)
         result.append({
             'label': label,
             'value': round(value, 2) if value is not None else None
         })
-    
+
     return result
 
 
 def calculate_adrr_data(glucose_rows, windows):
     """Calculate ADRR for each time window.
-    
+
     Args:
         glucose_rows: List of (timestamp_str, level) tuples
         windows: List of (label, start, end) tuples
-    
+
     Returns:
         List of {'label': str, 'value': float} dicts
     """
     result = []
-    
+
     for label, window_start, window_end in windows:
         # Filter glucose data for this window
         window_rows = [
             (ts, level) for ts, level in glucose_rows
             if window_start <= ts <= window_end
         ]
-        
+
         # Calculate ADRR for this window (treats window as full period)
         adrr = calculate_adrr(window_rows, [(label, window_start, window_end)])
         result.append({
             'label': label,
             'value': round(adrr, 2) if adrr is not None else None
         })
-    
+
     return result
 
 
@@ -336,7 +336,7 @@ def calculate_standard_deviation(data):
     """Calculate standard deviation of glucose values."""
     if len(data) < 2:
         return None
-    
+
     values = [v for _, v in data]
     mean = sum(values) / len(values)
     variance = sum((v - mean) ** 2 for v in values) / len(values)
@@ -347,15 +347,15 @@ def calculate_cv(data):
     """Calculate coefficient of variation (CV) as percentage."""
     if len(data) < 2:
         return None
-    
+
     time_weighted_mean = calculate_time_weighted_mean(data)
     if time_weighted_mean is None or time_weighted_mean == 0:
         return None
-    
+
     std_dev = calculate_standard_deviation(data)
     if std_dev is None:
         return None
-    
+
     return (std_dev / time_weighted_mean) * 100
 
 
@@ -363,22 +363,22 @@ def calculate_weekly_mean(rows):
     """Group glucose data by week and calculate time-weighted mean."""
     if len(rows) < 2:
         return []
-    
+
     weekly_data = defaultdict(list)
-    
+
     for timestamp_str, level in rows:
         dt = datetime.strptime(timestamp_str, '%Y-%m-%d %H:%M:%S')
         iso_year, iso_week, _ = dt.isocalendar()
         week_key = f'{iso_year}/W{iso_week:02d}'
         weekly_data[week_key].append((dt, level))
-    
+
     result = []
     for week_key in sorted(weekly_data.keys()):
         data = weekly_data[week_key]
         mean = calculate_time_weighted_mean(data)
         if mean is not None:
             result.append({'week': week_key, 'mean': round(mean, 2)})
-    
+
     return result
 
 
@@ -387,7 +387,7 @@ def calculate_weekly_mean_both(glucose_rows, insulin_rows):
     weekly_glucose = defaultdict(list)
     weekly_insulin = defaultdict(list)
     all_weeks = set()
-    
+
     # Group glucose data by week
     for timestamp_str, level in glucose_rows:
         dt = datetime.strptime(timestamp_str, '%Y-%m-%d %H:%M:%S')
@@ -395,7 +395,7 @@ def calculate_weekly_mean_both(glucose_rows, insulin_rows):
         week_key = f'{iso_year}/W{iso_week:02d}'
         weekly_glucose[week_key].append((dt, level))
         all_weeks.add(week_key)
-    
+
     # Group insulin data by week
     for timestamp_str, level in insulin_rows:
         dt = datetime.strptime(timestamp_str, '%Y-%m-%d %H:%M:%S')
@@ -403,24 +403,24 @@ def calculate_weekly_mean_both(glucose_rows, insulin_rows):
         week_key = f'{iso_year}/W{iso_week:02d}'
         weekly_insulin[week_key].append((dt, level))
         all_weeks.add(week_key)
-    
+
     result = []
     for week_key in sorted(all_weeks):
         glucose_mean = None
         insulin_mean = None
-        
+
         if week_key in weekly_glucose and len(weekly_glucose[week_key]) >= 2:
             glucose_mean = calculate_time_weighted_mean(weekly_glucose[week_key])
-        
+
         if week_key in weekly_insulin and len(weekly_insulin[week_key]) >= 2:
             insulin_mean = calculate_time_weighted_mean(weekly_insulin[week_key])
-        
+
         result.append({
             'week': week_key,
             'glucose_mean': round(glucose_mean, 2) if glucose_mean is not None else None,
             'insulin_mean': round(insulin_mean, 2) if insulin_mean is not None else None
         })
-    
+
     return result
 
 
@@ -428,7 +428,7 @@ def calculate_standard_deviation(data):
     """Calculate standard deviation of glucose values."""
     if len(data) < 2:
         return None
-    
+
     values = [v for _, v in data]
     mean = sum(values) / len(values)
     variance = sum((v - mean) ** 2 for v in values) / len(values)
@@ -439,41 +439,41 @@ def calculate_cv(data):
     """Calculate coefficient of variation (CV) as percentage."""
     if len(data) < 2:
         return None
-    
+
     time_weighted_mean = calculate_time_weighted_mean(data)
     if time_weighted_mean is None or time_weighted_mean == 0:
         return None
-    
+
     std_dev = calculate_standard_deviation(data)
     if std_dev is None:
         return None
-    
+
     return (std_dev / time_weighted_mean) * 100
 
 
 def generate_cv_windows(end_date, days, window_hours):
     """Generate time windows for CV calculation.
-    
+
     Args:
         end_date: End date (datetime.date)
         days: Number of days to look back
         window_hours: Window size in hours (12, 48, or 120)
-    
+
     Returns:
         List of (window_label, window_start, window_end) tuples
     """
     windows = []
     anchor_time = datetime.combine(end_date, datetime.min.time()) + timedelta(hours=5)
-    
+
     current_window_end = anchor_time
-    
+
     while True:
         window_start = current_window_end - timedelta(hours=window_hours)
-        
+
         days_back = (anchor_time - window_start).total_seconds() / 86400
         if days_back > days:
             break
-        
+
         if window_hours == 12:
             if window_start.hour == 5:
                 label = f"{window_start.strftime('%Y-%m-%d')} Day"
@@ -483,43 +483,43 @@ def generate_cv_windows(end_date, days, window_hours):
             label = f"{window_start.strftime('%Y-%m-%d')} to {current_window_end.strftime('%Y-%m-%d')}"
         else:
             label = f"{window_start.strftime('%Y-%m-%d')} to {current_window_end.strftime('%Y-%m-%d')}"
-        
+
         windows.append((
             label,
             window_start.strftime('%Y-%m-%d %H:%M:%S'),
             current_window_end.strftime('%Y-%m-%d %H:%M:%S')
         ))
-        
+
         current_window_end = window_start
-    
+
     return list(reversed(windows))
 
 
 def calculate_cv_data(glucose_rows, windows):
     """Calculate CV for each time window.
-    
+
     Args:
         glucose_rows: List of (timestamp_str, level) tuples
         windows: List of (label, start, end) tuples
-    
+
     Returns:
         List of {'label': str, 'cv': float} dicts
     """
     result = []
-    
+
     for label, window_start, window_end in windows:
         window_data = []
         for timestamp_str, level in glucose_rows:
             if window_start <= timestamp_str <= window_end:
                 dt = datetime.strptime(timestamp_str, '%Y-%m-%d %H:%M:%S')
                 window_data.append((dt, level))
-        
+
         cv = calculate_cv(window_data)
         result.append({
             'label': label,
             'cv': round(cv, 2) if cv is not None else None
         })
-    
+
     return result
 
 
@@ -527,7 +527,7 @@ def get_previous_time_window():
     """Calculate previous 12-hour time window."""
     now = datetime.now()
     current_hour = now.hour
-    
+
     if 5 <= current_hour < 17:  # Current is Day (05:00-16:59), previous is Night
         # Previous night window: 17:00 yesterday to 04:59 today
         prev_start = (now - timedelta(days=1)).strftime('%Y-%m-%d') + ' 17:00:00'
@@ -541,7 +541,7 @@ def get_previous_time_window():
             # Previous day window: 05:00 to 16:59 yesterday
             prev_start = (now - timedelta(days=1)).strftime('%Y-%m-%d') + ' 05:00:00'
             prev_end = (now - timedelta(days=1)).strftime('%Y-%m-%d') + ' 16:59:59'
-    
+
     return prev_start, prev_end
 
 
@@ -555,13 +555,13 @@ def process_time_window_summary(cursor, window_icon, date_str, window_start, win
                      ORDER BY i.timestamp''',
                   (window_start, window_end))
     intakes = cursor.fetchall()
-    
+
     # Determine reference time for glucose levels
     if intakes:
         # Use first intake time as reference
         first_intake_time = intakes[0][0]
         intake_dt = datetime.strptime(first_intake_time, '%Y-%m-%d %H:%M:%S')
-        
+
         # Aggregate nutrition data
         total_kcal = sum(row[1] for row in intakes)
         nutrition_items = [f"{row[3]} ({row[1]:.1f} kcal)" for row in intakes]
@@ -572,7 +572,7 @@ def process_time_window_summary(cursor, window_icon, date_str, window_start, win
         intake_dt = datetime.strptime(window_start, '%Y-%m-%d %H:%M:%S')
         total_kcal = 0
         nutrition_str = ''
-    
+
     # Get insulin dose in this window
     cursor.execute('''SELECT timestamp, level FROM insulin
                      WHERE timestamp BETWEEN ? AND ?
@@ -581,10 +581,10 @@ def process_time_window_summary(cursor, window_icon, date_str, window_start, win
     insulin_row = cursor.fetchone()
     dose_time = insulin_row[0] if insulin_row else None
     dosage = insulin_row[1] if insulin_row else None
-    
+
     # Get glucose levels based on reference time
     glucose_levels = get_glucose_levels_around_intake(cursor, intake_dt.strftime('%Y-%m-%d %H:%M:%S'), intake_dt)
-    
+
     # Get events in window
     cursor.execute('''SELECT event_name FROM event
                      WHERE timestamp BETWEEN ? AND ?
@@ -592,9 +592,9 @@ def process_time_window_summary(cursor, window_icon, date_str, window_start, win
                   (window_start, window_end))
     events = cursor.fetchall()
     grouped_events = ', '.join([e[0] for e in events]) if events else ''
-    
+
     # Get supplements in window
-    cursor.execute('''SELECT s.supplement_name, si.supplement_amount 
+    cursor.execute('''SELECT s.supplement_name, si.supplement_amount
                      FROM supplement_intake si
                      JOIN supplements s ON si.supplement_id = s.id
                      WHERE si.timestamp BETWEEN ? AND ?
@@ -602,12 +602,12 @@ def process_time_window_summary(cursor, window_icon, date_str, window_start, win
                   (window_start, window_end))
     supplements = cursor.fetchall()
     grouped_supplements = ', '.join([f"{s[0]} {s[1]}" for s in supplements]) if supplements else ''
-    
+
     # Check if there's any data in this window
     has_data = intakes or insulin_row or events or supplements
     if not has_data:
         return None
-    
+
     return {
         'am_pm': window_icon,
         'date': date_str,
@@ -625,7 +625,7 @@ def process_time_window_summary(cursor, window_icon, date_str, window_start, win
 def get_glucose_levels_around_intake(cursor, first_intake_time, intake_dt):
     """Get glucose levels at and after intake (0 to 11 hours)."""
     glucose_levels = {}
-    
+
     # +0: Most recent glucose before or at intake time
     cursor.execute('''SELECT level FROM glucose
                      WHERE timestamp <= ?
@@ -633,59 +633,60 @@ def get_glucose_levels_around_intake(cursor, first_intake_time, intake_dt):
                   (first_intake_time,))
     zero_row = cursor.fetchone()
     glucose_levels['+0'] = zero_row[0] if zero_row else None
-    
+
     # +1 to +11: Average glucose in ±30min window after intake
     for hour in range(1, 12):
         target_time = intake_dt + timedelta(hours=hour)
-        
+
         # Get average glucose in ±30min window
         window_start_time = (target_time - timedelta(minutes=30)).strftime('%Y-%m-%d %H:%M:%S')
         window_end_time = (target_time + timedelta(minutes=30)).strftime('%Y-%m-%d %H:%M:%S')
-        
+
         cursor.execute('''SELECT AVG(level) FROM glucose
                          WHERE timestamp BETWEEN ? AND ?''',
                       (window_start_time, window_end_time))
         avg_row = cursor.fetchone()
         glucose_levels[f'+{hour}'] = round(avg_row[0], 1) if avg_row[0] else None
-    
+
     return glucose_levels
 
 
-def predict_next_window(lookback_days=14):
+def predict_next_window(lookback_days=30):
     """
     Predict next glucose level and insulin dose using statistical baseline.
-    
+
     Args:
-        lookback_days: Number of days of historical data to use (default: 14)
-    
+        lookback_days: Number of days of historical data to use (default: 30)
+
     Returns:
         dict: Prediction results with glucose, insulin, confidence, and warnings
     """
     # Calculate lookback start time
     now = datetime.now()
     lookback_start = (now - timedelta(days=lookback_days)).strftime('%Y-%m-%d %H:%M:%S')
-    
+
     with get_db_connection() as conn:
         cursor = conn.cursor()
-        
-        # Fetch historical glucose data
+
+        # Fetch historical glucose data in chronological order (ASC)
+        # for time-weighted mean calculation
         cursor.execute('''
-            SELECT timestamp, level 
-            FROM glucose 
-            WHERE timestamp >= ? 
-            ORDER BY timestamp DESC
+            SELECT timestamp, level
+            FROM glucose
+            WHERE timestamp >= ?
+            ORDER BY timestamp ASC
         ''', (lookback_start,))
         glucose_data = cursor.fetchall()
-        
-        # Fetch historical insulin data
+
+        # Fetch historical insulin data in chronological order (ASC)
         cursor.execute('''
-            SELECT timestamp, level 
-            FROM insulin 
-            WHERE timestamp >= ? 
-            ORDER BY timestamp DESC
+            SELECT timestamp, level
+            FROM insulin
+            WHERE timestamp >= ?
+            ORDER BY timestamp ASC
         ''', (lookback_start,))
         insulin_data = cursor.fetchall()
-        
+
         # Fetch recent intake data (last 7 days for calorie context)
         intake_start = (now - timedelta(days=7)).strftime('%Y-%m-%d %H:%M:%S')
         cursor.execute('''
@@ -696,7 +697,7 @@ def predict_next_window(lookback_days=14):
             ORDER BY i.timestamp DESC
         ''', (intake_start,))
         intake_data = cursor.fetchall()
-    
+
     # Data quality checks
     warnings = []
     if len(glucose_data) < 10:
@@ -711,44 +712,44 @@ def predict_next_window(lookback_days=14):
             'warnings': warnings + ["Cannot generate prediction with insufficient data"],
             'error': 'insufficient_data'
         }
-    
+
     # 1. Calculate predicted glucose using time-weighted mean of recent data
     # Use last 24 hours of data for prediction
     recent_cutoff = (now - timedelta(hours=24)).strftime('%Y-%m-%d %H:%M:%S')
     recent_glucose = [(row[0], row[1]) for row in glucose_data if row[0] >= recent_cutoff]
-    
+
     if len(recent_glucose) < 2:
         # Fall back to last 2 readings if insufficient recent data
-        recent_glucose = glucose_data[:2]
-    
-    # Convert timestamp strings to datetime objects and reverse to chronological order
-    # (glucose_data is DESC, but time-weighted mean needs ascending time)
+        # Data is in ASC order, so last 2 are the most recent
+        recent_glucose = glucose_data[-2:] if len(glucose_data) >= 2 else glucose_data
+
+    # Convert timestamp strings to datetime objects (data already in ASC order from SQL)
     recent_glucose_parsed = [
-        (datetime.strptime(ts, '%Y-%m-%d %H:%M:%S'), level) 
-        for ts, level in reversed(recent_glucose)
+        (datetime.strptime(ts, '%Y-%m-%d %H:%M:%S'), level)
+        for ts, level in recent_glucose
     ]
     predicted_glucose = calculate_time_weighted_mean(recent_glucose_parsed)
-    
+
     # Check if time-weighted mean failed (can happen if all timestamps are identical)
     if predicted_glucose is None:
         # Use simple average of recent glucose values as fallback
         predicted_glucose = sum(row[1] for row in recent_glucose) / len(recent_glucose)
         warnings.append("Using simple average (insufficient time spread in data)")
-    
+
     # Calculate glucose statistics for full dataset
     all_glucose_values = [row[1] for row in glucose_data]
     avg_glucose = sum(all_glucose_values) / len(all_glucose_values)
     glucose_std = math.sqrt(sum((x - avg_glucose) ** 2 for x in all_glucose_values) / len(all_glucose_values))
-    
+
     # Calculate CV for confidence assessment
     cv = (glucose_std / avg_glucose * 100) if avg_glucose > 0 else 100
-    
+
     # Calculate uncertainty range (±1 std dev)
     glucose_range = [
         max(40, predicted_glucose - glucose_std),
         min(500, predicted_glucose + glucose_std)
     ]
-    
+
     # 2. Calculate insulin recommendation
     if len(insulin_data) > 0:
         # Calculate insulin-to-glucose ratio
@@ -756,38 +757,38 @@ def predict_next_window(lookback_days=14):
         insulin_glucose_pairs = []
         for insulin_ts, insulin_level in insulin_data:
             insulin_time = datetime.strptime(insulin_ts, '%Y-%m-%d %H:%M:%S')
-            
+
             # Find closest glucose reading within 2 hours
             for glucose_ts, glucose_level in glucose_data:
                 glucose_time = datetime.strptime(glucose_ts, '%Y-%m-%d %H:%M:%S')
                 time_diff = abs((insulin_time - glucose_time).total_seconds())
-                
+
                 if time_diff <= 7200:  # 2 hours
                     insulin_glucose_pairs.append((insulin_level, glucose_level))
                     break
-        
+
         if insulin_glucose_pairs:
             # Calculate average ratio
             ratios = [insulin / glucose for insulin, glucose in insulin_glucose_pairs if glucose > 0]
             avg_ratio = sum(ratios) / len(ratios) if ratios else 0
-            
+
             # Apply ratio to predicted glucose
             recommended_insulin = predicted_glucose * avg_ratio
-            
+
             # Adjust for recent calorie intake (last 24 hours)
             if len(intake_data) > 0:
                 recent_calories = sum(row[1] for row in intake_data[:5] if row[1])  # Last 5 meals
                 avg_calories = recent_calories / min(5, len(intake_data))
-                
+
                 # If calories are high (>100 kcal), slightly increase insulin (up to 10%)
                 if avg_calories > 100:
                     calorie_factor = min(1.1, 1 + (avg_calories - 100) / 1000)
                     recommended_insulin *= calorie_factor
-            
+
             # Apply safety bounds
             max_insulin = max([row[1] for row in insulin_data]) * 1.5 if insulin_data else 2.0
             recommended_insulin = max(0, min(recommended_insulin, max_insulin))
-            
+
             avg_insulin = sum(row[1] for row in insulin_data) / len(insulin_data)
         else:
             # No valid insulin-glucose pairs found
@@ -798,26 +799,26 @@ def predict_next_window(lookback_days=14):
         warnings.append("No insulin data available for recommendation")
         recommended_insulin = None
         avg_insulin = None
-    
+
     # 3. Assess confidence level
     confidence = _calculate_confidence(len(glucose_data), cv, glucose_std, all_glucose_values)
-    
+
     # 4. Generate warnings
     if cv > 35:
         warnings.append("High glucose variability detected (CV > 35%)")
-    
+
     if predicted_glucose < 60:
         warnings.append("⚠️ ALERT: Predicted hypoglycemia risk (< 60 mg/dL)")
     elif predicted_glucose > 400:
         warnings.append("⚠️ ALERT: Predicted hyperglycemia risk (> 400 mg/dL)")
-    
+
     # Check for unusual patterns (>2 std dev from mean)
     if abs(predicted_glucose - avg_glucose) > 2 * glucose_std:
         warnings.append("Unusual pattern detected - prediction differs significantly from historical average")
-    
+
     if not warnings:
         warnings.append("Monitor closely and adjust as needed")
-    
+
     return {
         'next_window': _get_next_window_name(now),
         'prediction': {
@@ -840,7 +841,7 @@ def predict_next_window(lookback_days=14):
 def _get_next_window_name(current_time):
     """Determine the name of the next time window."""
     hour = current_time.hour
-    
+
     # Day window: 05:00-16:59, Night window: 17:00-04:59
     if 5 <= hour < 17:
         # Currently in day window, next is night
@@ -859,7 +860,7 @@ def _calculate_confidence(data_points, cv, std_dev, values):
         stable_trend = recent_std < std_dev * 0.8
     else:
         stable_trend = False
-    
+
     # Confidence criteria
     if cv < 25 and data_points >= 30 and stable_trend:
         return "High"
@@ -875,129 +876,129 @@ def _calculate_confidence(data_points, cv, std_dev, values):
 
 class DataAccess:
     """Data access layer for database operations."""
-    
+
     @staticmethod
     def create_glucose(timestamp, level):
         execute_query('INSERT INTO glucose (timestamp, level) VALUES (?, ?)',
                      (timestamp, level), commit=True)
-    
+
     @staticmethod
     def create_insulin(timestamp, level):
         execute_query('INSERT INTO insulin (timestamp, level) VALUES (?, ?)',
                      (timestamp, level), commit=True)
-    
+
     @staticmethod
     def create_intake(nutrition_id, timestamp, nutrition_amount):
         kcal_per_gram = execute_query(
             'SELECT kcal_per_gram FROM nutrition WHERE id = ?',
             (nutrition_id,), fetch_one=True)
-        
+
         if not kcal_per_gram:
             raise ValueError('Nutrition not found')
-        
+
         nutrition_kcal = nutrition_amount * kcal_per_gram[0]
-        execute_query('''INSERT INTO intake 
-                        (nutrition_id, timestamp, nutrition_amount, nutrition_kcal) 
+        execute_query('''INSERT INTO intake
+                        (nutrition_id, timestamp, nutrition_amount, nutrition_kcal)
                         VALUES (?, ?, ?, ?)''',
                      (nutrition_id, timestamp, nutrition_amount, nutrition_kcal), commit=True)
         return nutrition_kcal
-    
+
     @staticmethod
     def create_supplement_master(supplement_name, default_amount=1):
-        execute_query('''INSERT INTO supplements 
-                        (supplement_name, default_amount) 
+        execute_query('''INSERT INTO supplements
+                        (supplement_name, default_amount)
                         VALUES (?, ?)''',
                      (supplement_name, default_amount), commit=True)
-    
+
     @staticmethod
     def create_supplement_intake(timestamp, supplement_id, supplement_amount):
-        execute_query('''INSERT INTO supplement_intake 
-                        (timestamp, supplement_id, supplement_amount) 
+        execute_query('''INSERT INTO supplement_intake
+                        (timestamp, supplement_id, supplement_amount)
                         VALUES (?, ?, ?)''',
                      (timestamp, supplement_id, supplement_amount), commit=True)
-    
+
     @staticmethod
     def create_event(timestamp, event_name, event_notes=''):
-        execute_query('''INSERT INTO event 
-                        (timestamp, event_name, event_notes) 
+        execute_query('''INSERT INTO event
+                        (timestamp, event_name, event_notes)
                         VALUES (?, ?, ?)''',
                      (timestamp, event_name, event_notes), commit=True)
-    
+
     @staticmethod
     def create_nutrition(nutrition_name, kcal, weight):
-        execute_query('''INSERT INTO nutrition 
-                        (nutrition_name, kcal, weight) 
+        execute_query('''INSERT INTO nutrition
+                        (nutrition_name, kcal, weight)
                         VALUES (?, ?, ?)''',
                      (nutrition_name, kcal, weight), commit=True)
-    
+
     @staticmethod
     def update_glucose(record_id, timestamp, level):
         execute_query('UPDATE glucose SET timestamp = ?, level = ? WHERE id = ?',
                      (timestamp, level, record_id), commit=True)
-    
+
     @staticmethod
     def update_insulin(record_id, timestamp, level):
         execute_query('UPDATE insulin SET timestamp = ?, level = ? WHERE id = ?',
                      (timestamp, level, record_id), commit=True)
-    
+
     @staticmethod
     def update_intake(record_id, nutrition_id, timestamp, nutrition_amount):
         kcal_per_gram = execute_query(
             'SELECT kcal_per_gram FROM nutrition WHERE id = ?',
             (nutrition_id,), fetch_one=True)
-        
+
         if not kcal_per_gram:
             raise ValueError('Nutrition not found')
-        
+
         nutrition_kcal = nutrition_amount * kcal_per_gram[0]
-        execute_query('''UPDATE intake 
+        execute_query('''UPDATE intake
                         SET timestamp = ?, nutrition_id = ?, nutrition_amount = ?, nutrition_kcal = ?
                         WHERE id = ?''',
                      (timestamp, nutrition_id, nutrition_amount, nutrition_kcal, record_id), commit=True)
-    
+
     @staticmethod
     def update_supplement_master(record_id, supplement_name, default_amount=1):
-        execute_query('''UPDATE supplements 
+        execute_query('''UPDATE supplements
                         SET supplement_name = ?, default_amount = ?
                         WHERE id = ?''',
                      (supplement_name, default_amount, record_id), commit=True)
-    
+
     @staticmethod
     def update_supplement_intake(record_id, timestamp, supplement_id, supplement_amount):
-        execute_query('''UPDATE supplement_intake 
+        execute_query('''UPDATE supplement_intake
                         SET timestamp = ?, supplement_id = ?, supplement_amount = ?
                         WHERE id = ?''',
                      (timestamp, supplement_id, supplement_amount, record_id), commit=True)
-    
+
     @staticmethod
     def update_event(record_id, timestamp, event_name, event_notes=''):
-        execute_query('''UPDATE event 
+        execute_query('''UPDATE event
                         SET timestamp = ?, event_name = ?, event_notes = ?
                         WHERE id = ?''',
                      (timestamp, event_name, event_notes, record_id), commit=True)
-    
+
     @staticmethod
     def update_nutrition(record_id, nutrition_name, kcal, weight):
-        execute_query('''UPDATE nutrition 
+        execute_query('''UPDATE nutrition
                         SET nutrition_name = ?, kcal = ?, weight = ?
                         WHERE id = ?''',
                      (nutrition_name, kcal, weight, record_id), commit=True)
-    
+
     @staticmethod
     def delete_record(table, record_id):
         execute_query(f'DELETE FROM {table} WHERE id = ?', (record_id,), commit=True)
-    
+
     @staticmethod
     def get_nutrition_list():
         rows = execute_query('SELECT id, nutrition_name, kcal, weight, kcal_per_gram FROM nutrition')
-        return [{'id': row[0], 'nutrition_name': row[1], 'kcal': row[2], 
+        return [{'id': row[0], 'nutrition_name': row[1], 'kcal': row[2],
                 'weight': row[3], 'kcal_per_gram': row[4]} for row in rows]
-    
+
     @staticmethod
     def get_supplements_list():
         rows = execute_query('SELECT id, supplement_name, default_amount FROM supplements')
         return [{'id': row[0], 'supplement_name': row[1], 'default_amount': row[2]} for row in rows]
-    
+
     @staticmethod
     def get_list_with_filter(query, start_date, end_date, default_hours=24):
         if start_date and end_date:
@@ -1013,13 +1014,13 @@ class DataAccess:
 # ============================================================================
 
 class GlucoseHandler(http.server.SimpleHTTPRequestHandler):
-    
+
     def guess_type(self, path):
         """Override to properly handle .dev extension as HTML."""
         if path.endswith('.html.dev'):
             return 'text/html'
         return super().guess_type(path)
-    
+
     def list_directory(self, path):
         """Redirect root directory to index.html (or index.html.dev in dev mode)."""
         index_file = 'index.html.dev' if not MTLS_ENABLED else 'index.html'
@@ -1027,7 +1028,7 @@ class GlucoseHandler(http.server.SimpleHTTPRequestHandler):
         self.send_header('Location', f'/static/{index_file}')
         self.end_headers()
         return None
-    
+
     def _set_headers(self, status=200, content_type='application/json'):
         self.send_response(status)
         self.send_header('Content-type', content_type)
@@ -1035,36 +1036,36 @@ class GlucoseHandler(http.server.SimpleHTTPRequestHandler):
         self.send_header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
         self.send_header('Access-Control-Allow-Headers', 'Content-Type')
         self.end_headers()
-    
+
     def _send_json(self, data, status=200):
         self._set_headers(status)
         self.wfile.write(json.dumps(data).encode())
-    
+
     def _send_error_json(self, error_msg, status=400):
         self._set_headers(status)
         self.wfile.write(json.dumps({'error': error_msg}).encode())
-    
+
     def do_OPTIONS(self):
         self._set_headers()
-    
+
     def log_message(self, format, *args):
         """Override to add timestamp to request logs"""
         timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         print(f"[{timestamp}] {format % args}")
-    
+
     def do_GET(self):
         try:
             parsed_path = urllib.parse.urlparse(self.path)
             path = parsed_path.path
             query_params = urllib.parse.parse_qs(parsed_path.query)
-            
+
             # In dev mode (MTLS_ENABLED=false), redirect index.html to index.html.dev
             if not MTLS_ENABLED and path == '/static/index.html':
                 self.send_response(301)
                 self.send_header('Location', '/static/index.html.dev')
                 self.end_headers()
                 return
-            
+
             route_handlers = {
                 '/api/nutrition': lambda: self._send_json(DataAccess.get_nutrition_list()),
                 '/api/supplements': lambda: self._send_json(DataAccess.get_supplements_list()),
@@ -1080,14 +1081,14 @@ class GlucoseHandler(http.server.SimpleHTTPRequestHandler):
                 '/api/dashboard/risk-metrics': lambda: self.handle_get_risk_metrics(query_params),
                 '/api/dashboard/prediction': lambda: self.handle_get_prediction(query_params),
             }
-            
+
             if path in route_handlers:
                 route_handlers[path]()
             else:
                 super().do_GET()
         except Exception as e:
             self._send_error_json(f'Server error: {str(e)}', 500)
-    
+
     def do_POST(self):
         try:
             content_length = int(self.headers['Content-Length'])
@@ -1099,7 +1100,7 @@ class GlucoseHandler(http.server.SimpleHTTPRequestHandler):
         except Exception as e:
             self._send_error_json(f'Request error: {str(e)}', 400)
             return
-        
+
         try:
             if self.path == '/api/glucose':
                 DataAccess.create_glucose(data['timestamp'], data['level'])
@@ -1108,19 +1109,19 @@ class GlucoseHandler(http.server.SimpleHTTPRequestHandler):
                 DataAccess.create_insulin(data['timestamp'], data['level'])
                 self._send_json({'success': True}, 201)
             elif self.path == '/api/intake':
-                kcal = DataAccess.create_intake(data['nutrition_id'], data['timestamp'], 
+                kcal = DataAccess.create_intake(data['nutrition_id'], data['timestamp'],
                                                 data['nutrition_amount'])
                 self._send_json({'success': True, 'nutrition_kcal': kcal}, 201)
             elif self.path == '/api/supplements':
-                DataAccess.create_supplement_master(data['supplement_name'], 
+                DataAccess.create_supplement_master(data['supplement_name'],
                                                     data.get('default_amount', 1))
                 self._send_json({'success': True}, 201)
             elif self.path == '/api/supplement-intake':
-                DataAccess.create_supplement_intake(data['timestamp'], data['supplement_id'], 
+                DataAccess.create_supplement_intake(data['timestamp'], data['supplement_id'],
                                                     data['supplement_amount'])
                 self._send_json({'success': True}, 201)
             elif self.path == '/api/event':
-                DataAccess.create_event(data['timestamp'], data['event_name'], 
+                DataAccess.create_event(data['timestamp'], data['event_name'],
                                        data.get('event_notes', ''))
                 self._send_json({'success': True}, 201)
             elif self.path == '/api/nutrition':
@@ -1132,7 +1133,7 @@ class GlucoseHandler(http.server.SimpleHTTPRequestHandler):
             self._send_error_json(str(e), 400)
         except Exception as e:
             self._send_error_json(f'Server error: {str(e)}', 500)
-    
+
     def do_PUT(self):
         try:
             content_length = int(self.headers['Content-Length'])
@@ -1144,43 +1145,43 @@ class GlucoseHandler(http.server.SimpleHTTPRequestHandler):
         except Exception as e:
             self._send_error_json(f'Request error: {str(e)}', 400)
             return
-        
+
         try:
             record_id = int(self.path.split('/')[-1])
-            
+
             if '/api/glucose/' in self.path:
                 DataAccess.update_glucose(record_id, data['timestamp'], data['level'])
             elif '/api/insulin/' in self.path:
                 DataAccess.update_insulin(record_id, data['timestamp'], data['level'])
             elif '/api/intake/' in self.path:
-                DataAccess.update_intake(record_id, data['nutrition_id'], 
+                DataAccess.update_intake(record_id, data['nutrition_id'],
                                         data['timestamp'], data['nutrition_amount'])
             elif '/api/supplements/' in self.path:
-                DataAccess.update_supplement_master(record_id, data['supplement_name'], 
+                DataAccess.update_supplement_master(record_id, data['supplement_name'],
                                                    data.get('default_amount', 1))
             elif '/api/supplement-intake/' in self.path:
-                DataAccess.update_supplement_intake(record_id, data['timestamp'], 
+                DataAccess.update_supplement_intake(record_id, data['timestamp'],
                                                    data['supplement_id'], data['supplement_amount'])
             elif '/api/event/' in self.path:
-                DataAccess.update_event(record_id, data['timestamp'], data['event_name'], 
+                DataAccess.update_event(record_id, data['timestamp'], data['event_name'],
                                        data.get('event_notes', ''))
             elif '/api/nutrition/' in self.path:
-                DataAccess.update_nutrition(record_id, data['nutrition_name'], 
+                DataAccess.update_nutrition(record_id, data['nutrition_name'],
                                            data['kcal'], data['weight'])
             else:
                 self._send_error_json('Not found', 404)
                 return
-            
+
             self._send_json({'success': True})
         except ValueError as e:
             self._send_error_json(str(e), 400)
         except Exception as e:
             self._send_error_json(f'Server error: {str(e)}', 500)
-    
+
     def do_DELETE(self):
         try:
             record_id = int(self.path.split('/')[-1])
-            
+
             table_map = {
                 '/api/glucose/': 'glucose',
                 '/api/insulin/': 'insulin',
@@ -1190,13 +1191,13 @@ class GlucoseHandler(http.server.SimpleHTTPRequestHandler):
                 '/api/event/': 'event',
                 '/api/nutrition/': 'nutrition',
             }
-            
+
             table = None
             for prefix, table_name in table_map.items():
                 if prefix in self.path:
                     table = table_name
                     break
-            
+
             if table:
                 DataAccess.delete_record(table, record_id)
                 self._send_json({'success': True})
@@ -1204,77 +1205,77 @@ class GlucoseHandler(http.server.SimpleHTTPRequestHandler):
                 self._send_error_json('Not found', 404)
         except Exception as e:
             self._send_error_json(f'Server error: {str(e)}', 500)
-    
+
     # ========================================================================
     # API Endpoint Handlers
     # ========================================================================
-    
+
     def handle_get_list(self, table, query_params):
         """Generic handler for listing records with date filter."""
         start_date = query_params.get('start_date', [None])[0]
         end_date = query_params.get('end_date', [None])[0]
-        
-        query = f'''SELECT id, timestamp, level FROM {table} 
-                   WHERE timestamp BETWEEN ? AND ? 
+
+        query = f'''SELECT id, timestamp, level FROM {table}
+                   WHERE timestamp BETWEEN ? AND ?
                    ORDER BY timestamp DESC'''
-        
+
         rows = DataAccess.get_list_with_filter(query, start_date, end_date)
         records = [{'id': row[0], 'timestamp': row[1], 'level': row[2]} for row in rows]
         self._send_json(records)
-    
+
     def handle_get_intake_list(self, query_params):
         start_date = query_params.get('start_date', [None])[0]
         end_date = query_params.get('end_date', [None])[0]
-        
-        query = '''SELECT i.id, i.timestamp, i.nutrition_id, n.nutrition_name, 
+
+        query = '''SELECT i.id, i.timestamp, i.nutrition_id, n.nutrition_name,
                          i.nutrition_amount, i.nutrition_kcal
                   FROM intake i
                   JOIN nutrition n ON i.nutrition_id = n.id
-                  WHERE i.timestamp BETWEEN ? AND ? 
+                  WHERE i.timestamp BETWEEN ? AND ?
                   ORDER BY i.timestamp DESC'''
-        
+
         rows = DataAccess.get_list_with_filter(query, start_date, end_date)
-        records = [{'id': row[0], 'timestamp': row[1], 'nutrition_id': row[2], 
-                   'nutrition_name': row[3], 'nutrition_amount': row[4], 
+        records = [{'id': row[0], 'timestamp': row[1], 'nutrition_id': row[2],
+                   'nutrition_name': row[3], 'nutrition_amount': row[4],
                    'nutrition_kcal': row[5]} for row in rows]
         self._send_json(records)
-    
+
     def handle_get_supplement_intake_list(self, query_params):
         start_date = query_params.get('start_date', [None])[0]
         end_date = query_params.get('end_date', [None])[0]
-        
-        query = '''SELECT si.id, si.timestamp, si.supplement_id, s.supplement_name, 
+
+        query = '''SELECT si.id, si.timestamp, si.supplement_id, s.supplement_name,
                          si.supplement_amount
                   FROM supplement_intake si
                   JOIN supplements s ON si.supplement_id = s.id
-                  WHERE si.timestamp BETWEEN ? AND ? 
+                  WHERE si.timestamp BETWEEN ? AND ?
                   ORDER BY si.timestamp DESC'''
-        
+
         rows = DataAccess.get_list_with_filter(query, start_date, end_date)
-        records = [{'id': row[0], 'timestamp': row[1], 'supplement_id': row[2], 
+        records = [{'id': row[0], 'timestamp': row[1], 'supplement_id': row[2],
                    'supplement_name': row[3], 'supplement_amount': row[4]} for row in rows]
         self._send_json(records)
-    
+
     def handle_get_event_list(self, query_params):
         start_date = query_params.get('start_date', [None])[0]
         end_date = query_params.get('end_date', [None])[0]
-        
-        query = '''SELECT id, timestamp, event_name, event_notes 
-                  FROM event 
-                  WHERE timestamp BETWEEN ? AND ? 
+
+        query = '''SELECT id, timestamp, event_name, event_notes
+                  FROM event
+                  WHERE timestamp BETWEEN ? AND ?
                   ORDER BY timestamp DESC'''
-        
+
         rows = DataAccess.get_list_with_filter(query, start_date, end_date)
-        records = [{'id': row[0], 'timestamp': row[1], 'event_name': row[2], 
+        records = [{'id': row[0], 'timestamp': row[1], 'event_name': row[2],
                    'event_notes': row[3]} for row in rows]
         self._send_json(records)
-    
+
     def handle_get_previous_window_intake(self):
         prev_start, prev_end = get_previous_time_window()
-        
+
         with get_db_connection() as conn:
             cursor = conn.cursor()
-            
+
             # Get intake records
             cursor.execute('''SELECT i.nutrition_id, n.nutrition_name, i.nutrition_amount
                              FROM intake i
@@ -1283,7 +1284,7 @@ class GlucoseHandler(http.server.SimpleHTTPRequestHandler):
                              ORDER BY i.timestamp ASC''',
                           (prev_start, prev_end))
             intake_rows = cursor.fetchall()
-            
+
             # Get supplement intake records
             cursor.execute('''SELECT si.supplement_id, s.supplement_name, si.supplement_amount
                              FROM supplement_intake si
@@ -1292,149 +1293,149 @@ class GlucoseHandler(http.server.SimpleHTTPRequestHandler):
                              ORDER BY si.timestamp ASC''',
                           (prev_start, prev_end))
             supplement_rows = cursor.fetchall()
-        
-        intake_records = [{'nutrition_id': row[0], 'nutrition_name': row[1], 
+
+        intake_records = [{'nutrition_id': row[0], 'nutrition_name': row[1],
                           'nutrition_amount': row[2]} for row in intake_rows]
-        supplement_records = [{'supplement_id': row[0], 'supplement_name': row[1], 
+        supplement_records = [{'supplement_id': row[0], 'supplement_name': row[1],
                               'supplement_amount': row[2]} for row in supplement_rows]
-        
+
         self._send_json({
             'nutrition': intake_records,
             'supplements': supplement_records
         })
-    
+
     def handle_get_glucose_chart(self, query_params):
         today = date.today()
         start_date = query_params.get('start_date', [f'{today.year}-01-01'])[0]
         end_date = query_params.get('end_date', [f'{today.year}-12-31'])[0]
-        
-        glucose_query = '''SELECT timestamp, level FROM glucose 
-                          WHERE timestamp BETWEEN ? AND ? 
+
+        glucose_query = '''SELECT timestamp, level FROM glucose
+                          WHERE timestamp BETWEEN ? AND ?
                           ORDER BY timestamp'''
-        
-        insulin_query = '''SELECT timestamp, level FROM insulin 
-                          WHERE timestamp BETWEEN ? AND ? 
+
+        insulin_query = '''SELECT timestamp, level FROM insulin
+                          WHERE timestamp BETWEEN ? AND ?
                           ORDER BY timestamp'''
-        
+
         glucose_rows = execute_query(glucose_query, (start_date, end_date + ' 23:59:59'))
         insulin_rows = execute_query(insulin_query, (start_date, end_date + ' 23:59:59'))
-        
+
         weekly_data = calculate_weekly_mean_both(glucose_rows, insulin_rows)
         self._send_json(weekly_data)
-    
+
     def handle_get_summary(self, query_params):
         today = date.today()
         start_date = query_params.get('start_date', [f'{today.year}-{today.month:02d}-01'])[0]
-        
+
         # Calculate last day of current month
         if today.month == 12:
             default_end = f'{today.year}-12-31'
         else:
             next_month = date(today.year, today.month + 1, 1)
             default_end = str(date(next_month.year, next_month.month, 1) - timedelta(days=1))
-        
+
         end_date = query_params.get('end_date', [default_end])[0]
-        
+
         with get_db_connection() as conn:
             cursor = conn.cursor()
-            
+
             # Get all dates in range
             start_dt = datetime.strptime(start_date, '%Y-%m-%d')
             end_dt = datetime.strptime(end_date, '%Y-%m-%d')
-            
+
             summary_data = []
             current_dt = start_dt
-            
+
             while current_dt <= end_dt:
                 date_str = current_dt.strftime('%Y-%m-%d')
-                
+
                 # Process Day window (05:00-16:59)
                 day_window_start = f'{date_str} 05:00:00'
                 day_window_end = f'{date_str} 16:59:59'
-                day_data = process_time_window_summary(cursor, '☀️', date_str, 
+                day_data = process_time_window_summary(cursor, '☀️', date_str,
                                                      day_window_start, day_window_end)
                 if day_data:
                     summary_data.append(day_data)
-                
+
                 # Process Night window (17:00 to 04:59 next day)
                 night_window_start = f'{date_str} 17:00:00'
                 next_day = (current_dt + timedelta(days=1)).strftime('%Y-%m-%d')
                 night_window_end = f'{next_day} 04:59:59'
-                night_data = process_time_window_summary(cursor, '🌙', date_str, 
+                night_data = process_time_window_summary(cursor, '🌙', date_str,
                                                      night_window_start, night_window_end)
                 if night_data:
                     summary_data.append(night_data)
-                
+
                 current_dt += timedelta(days=1)
-        
+
         self._send_json(summary_data)
-    
+
     def handle_get_cv_charts(self, query_params):
         today = date.today()
         end_date_str = query_params.get('end_date', [today.strftime('%Y-%m-%d')])[0]
         end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
-        
+
         # Calculate date ranges
         start_7_days = (end_date - timedelta(days=7)).strftime('%Y-%m-%d')
         start_30_days = (end_date - timedelta(days=30)).strftime('%Y-%m-%d')
         end_date_with_time = end_date_str + ' 23:59:59'
-        
+
         # Query glucose data for 30 days (covers all chart needs)
-        glucose_query = '''SELECT timestamp, level FROM glucose 
-                          WHERE timestamp BETWEEN ? AND ? 
+        glucose_query = '''SELECT timestamp, level FROM glucose
+                          WHERE timestamp BETWEEN ? AND ?
                           ORDER BY timestamp'''
         glucose_rows = execute_query(glucose_query, (start_30_days, end_date_with_time))
-        
+
         # Generate windows for each chart
         windows_7d_12h = generate_cv_windows(end_date, 7, 12)
         windows_30d_48h = generate_cv_windows(end_date, 30, 48)
         windows_30d_5d = generate_cv_windows(end_date, 30, 120)
-        
+
         # Calculate CV data for each chart
         cv_7d_12h = calculate_cv_data(glucose_rows, windows_7d_12h)
         cv_30d_48h = calculate_cv_data(glucose_rows, windows_30d_48h)
         cv_30d_5d = calculate_cv_data(glucose_rows, windows_30d_5d)
-        
+
         self._send_json({
             'cv_7d_12h': cv_7d_12h,
             'cv_30d_48h': cv_30d_48h,
             'cv_30d_5d': cv_30d_5d
         })
-    
+
     def handle_get_risk_metrics(self, query_params):
         today = date.today()
         end_date_str = query_params.get('end_date', [today.strftime('%Y-%m-%d')])[0]
         end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
-        
+
         # Calculate date ranges
         start_7_days = (end_date - timedelta(days=7)).strftime('%Y-%m-%d')
         start_30_days = (end_date - timedelta(days=30)).strftime('%Y-%m-%d')
         end_date_with_time = end_date_str + ' 23:59:59'
-        
+
         # Query glucose data for 30 days (covers all chart needs)
-        glucose_query = '''SELECT timestamp, level FROM glucose 
-                          WHERE timestamp BETWEEN ? AND ? 
+        glucose_query = '''SELECT timestamp, level FROM glucose
+                          WHERE timestamp BETWEEN ? AND ?
                           ORDER BY timestamp'''
         glucose_rows = execute_query(glucose_query, (start_30_days, end_date_with_time))
-        
+
         # Generate windows for each chart
         windows_7d_12h = generate_cv_windows(end_date, 7, 12)
         windows_30d_48h = generate_cv_windows(end_date, 30, 48)
         windows_30d_5d = generate_cv_windows(end_date, 30, 120)
-        
+
         # Calculate risk metrics for each chart
         lbgi_7d_12h = calculate_risk_metric_data(glucose_rows, windows_7d_12h, 'lbgi')
         lbgi_30d_48h = calculate_risk_metric_data(glucose_rows, windows_30d_48h, 'lbgi')
         lbgi_30d_5d = calculate_risk_metric_data(glucose_rows, windows_30d_5d, 'lbgi')
-        
+
         hbgi_7d_12h = calculate_risk_metric_data(glucose_rows, windows_7d_12h, 'hbgi')
         hbgi_30d_48h = calculate_risk_metric_data(glucose_rows, windows_30d_48h, 'hbgi')
         hbgi_30d_5d = calculate_risk_metric_data(glucose_rows, windows_30d_5d, 'hbgi')
-        
+
         adrr_7d_12h = calculate_adrr_data(glucose_rows, windows_7d_12h)
         adrr_30d_48h = calculate_adrr_data(glucose_rows, windows_30d_48h)
         adrr_30d_5d = calculate_adrr_data(glucose_rows, windows_30d_5d)
-        
+
         self._send_json({
             'lbgi_7d_12h': lbgi_7d_12h,
             'lbgi_30d_48h': lbgi_30d_48h,
@@ -1446,11 +1447,11 @@ class GlucoseHandler(http.server.SimpleHTTPRequestHandler):
             'adrr_30d_48h': adrr_30d_48h,
             'adrr_30d_5d': adrr_30d_5d
         })
-    
+
     def handle_get_prediction(self, query_params):
         """Handle GET /api/dashboard/prediction - Get glucose and insulin prediction."""
-        lookback_days = int(query_params.get('lookback_days', [14])[0])
-        
+        lookback_days = int(query_params.get('lookback_days', [30])[0])
+
         try:
             result = predict_next_window(lookback_days)
             self._send_json(result)
@@ -1481,7 +1482,7 @@ def check_certificate_expiration(cert_path):
             date_str = result.stdout.strip().split('=')[1]
             exp_date = datetime.strptime(date_str, '%b %d %H:%M:%S %Y %Z')
             days_left = (exp_date - datetime.now()).days
-            
+
             if days_left < 30:
                 print(f"WARNING: Certificate {cert_path} expires in {days_left} days!")
             elif days_left < 0:
@@ -1493,30 +1494,30 @@ def check_certificate_expiration(cert_path):
 def create_ssl_context():
     """Create and configure SSL context for mTLS."""
     context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-    
+
     # Require client certificates
     context.verify_mode = ssl.CERT_REQUIRED
-    
+
     # Load CA certificate for client verification
     context.load_verify_locations(cafile=CA_CERT_PATH)
-    
+
     # Load server certificate and key
     context.load_cert_chain(certfile=SERVER_CERT_PATH, keyfile=SERVER_KEY_PATH)
-    
+
     # Set minimum TLS version to 1.2
     context.minimum_version = ssl.TLSVersion.TLSv1_2
-    
+
     # Configure cipher suites (prefer strong ciphers)
     context.set_ciphers('HIGH:!aNULL:!MD5:!RC4')
-    
+
     print(f"mTLS Configuration:")
     print(f"  CA Certificate: {CA_CERT_PATH}")
     print(f"  Server Certificate: {SERVER_CERT_PATH}")
     print(f"  Server Key: {SERVER_KEY_PATH}")
-    
+
     # Check certificate expiration
     check_certificate_expiration(SERVER_CERT_PATH)
-    
+
     return context
 
 
@@ -1536,7 +1537,7 @@ def log_client_certificate(request, client_address):
 
 class SecureGlucoseHandler(GlucoseHandler):
     """Extended handler that logs client certificate info."""
-    
+
     def setup(self):
         super().setup()
         log_client_certificate(self.request, self.client_address)
@@ -1546,10 +1547,10 @@ def main():
     if not os.path.exists(DB_PATH):
         print(f"Error: Database {DB_PATH} not found. Please run init_db.py first.")
         return
-    
+
     socketserver.TCPServer.allow_reuse_address = True
     socketserver.ThreadingTCPServer.daemon_threads = True
-    
+
     if MTLS_ENABLED:
         # Check if certificate files exist
         if not all(os.path.exists(p) for p in [CA_CERT_PATH, SERVER_CERT_PATH, SERVER_KEY_PATH]):
@@ -1557,12 +1558,12 @@ def main():
             print("Please run ./generate-certs.sh to generate certificates.")
             print("Or set MTLS_ENABLED=false to disable mTLS.")
             return
-        
+
         # Create HTTPS server with mTLS (multi-threaded)
         with socketserver.ThreadingTCPServer(("", PORT), SecureGlucoseHandler) as httpd:
             ssl_context = create_ssl_context()
             httpd.socket = ssl_context.wrap_socket(httpd.socket, server_side=True)
-            
+
             print(f"✓ mTLS enabled - Server running at https://localhost:{PORT}/")
             print(f"  Clients must present valid certificates signed by the CA")
             print(f"  Multi-threaded mode: Handles concurrent requests")
@@ -1573,7 +1574,7 @@ def main():
         print("WARNING: mTLS is DISABLED - running in insecure mode!")
         print(f"Server running at http://localhost:{PORT}/")
         print(f"Multi-threaded mode: Handles concurrent requests")
-        
+
         with socketserver.ThreadingTCPServer(("", PORT), GlucoseHandler) as httpd:
             httpd.serve_forever()
 

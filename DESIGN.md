@@ -325,6 +325,42 @@ Click outside overlay to dismiss.
 
 ---
 
+### Glucose & Insulin Prediction
+
+**Purpose:** Predict next time window glucose level and recommend insulin dose based on historical patterns
+
+**Location:** Dashboard, below Summary Timesheet
+
+**Algorithm:** Statistical baseline using time-weighted mean
+
+**Data Source:**
+- Historical lookback: 30 days (configurable) for insulin ratios, CV, and statistics
+- Prediction window: Last 24 hours for glucose trend (recent data most relevant)
+- Uses glucose levels, insulin doses, and calorie intake
+- Calculates insulin-to-glucose ratios from paired data over full 30 days
+
+**Predictions:**
+- **Predicted Glucose:** Time-weighted mean of last 24 hours ± uncertainty range (emphasizes recent trends)
+- **Recommended Insulin:** Based on 30-day insulin-to-glucose ratio, adjusted for recent calorie intake
+- **Confidence Level:** High/Medium/Low based on 30-day data quality and variability
+
+**Display:**
+- Time window: Next Day (05:00-16:59) or Night (17:00-04:59)
+- Purple/blue theme with dashed border (distinct from historical data)
+- Predicted glucose with uncertainty range
+- Recommended insulin dose (if sufficient data)
+- Confidence indicator with visual dots (●●●○○)
+- Warnings for high variability, hypo/hyper risk
+- Medical disclaimers
+
+**Safety Features:**
+- Minimum 10 glucose readings required
+- Insulin capped at 1.5× historical maximum
+- Alerts for predicted hypoglycemia (< 60 mg/dL) or hyperglycemia (> 400 mg/dL)
+- Clear disclaimers: "For informational purposes only"
+
+---
+
 ### Nutrition List
 
 **Purpose:** Reference table of all nutrition items

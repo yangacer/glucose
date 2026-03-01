@@ -110,6 +110,33 @@ def get_db_connection():
 - **HBGI:** Averages high-risk values where f(G) > 0
 - **ADRR:** Groups by calendar day, sums LBGI + HBGI per day, averages across days
 
+### Glucose & Insulin Prediction
+- **Function:** `predict_next_window(lookback_days=30)`
+- **Algorithm:** Statistical baseline using time-weighted mean
+- **Data Source:** 
+  - Glucose: Last 30 days (configurable), ASC order for time-weighted mean
+  - Insulin: Last 30 days, paired with glucose within 2-hour window
+  - Intake: Last 7 days for calorie adjustment
+- **Design Philosophy:** Long history for context (30 days), recent data for prediction (24 hours)
+- **Glucose Prediction:**
+  - Time-weighted mean of **last 24 hours** of glucose data (emphasizes recent trends)
+  - 30-day data used for CV, statistics, and confidence assessment
+  - Falls back to last 2 readings if < 24h data available
+  - Fallback to simple average if all timestamps identical
+- **Insulin Recommendation:**
+  - Calculates insulin-to-glucose ratio from **30-day** historical pairs
+  - Adjusts for recent calorie intake (up to 10% increase if >100 kcal)
+  - Safety bounds: 0 to 1.5× historical maximum
+- **Confidence Calculation:**
+  - Based on **30-day** data quality
+  - High: CV < 25%, ≥30 data points, stable recent trend
+  - Medium: CV 25-35%, 14-30 data points
+  - Low: CV > 35%, <14 data points, or high variability
+- **Safety Features:**
+  - Minimum 10 glucose readings required (over 30 days)
+  - Warnings for CV > 35%, hypo < 60 mg/dL, hyper > 400 mg/dL
+  - Unusual pattern detection (>2 std dev from mean)
+
 ### Window Generation
 - **Function:** `generate_cv_windows(end_date, days, window_hours)`
 - **Anchor:** 5:00 AM on end_date
@@ -177,6 +204,7 @@ route_handlers = {
 - `/api/dashboard/summary` - Summary timesheet data
 - `/api/dashboard/cv-charts` - CV data for 3 time windows
 - `/api/dashboard/risk-metrics` - LBGI/HBGI/ADRR for 3 time windows
+- `/api/dashboard/prediction` - Glucose & insulin prediction (lookback_days=30 default)
 
 ---
 
@@ -796,6 +824,33 @@ sqlite3 glucose.db "ANALYZE;"
 ---
 
 # Version History
+
+## v0.8.0 (2026-03-01)
+
+**Prediction Feature:**
+- Implemented glucose & insulin prediction for next time window
+- Statistical baseline using time-weighted mean algorithm
+- 30-day lookback period (configurable via API parameter)
+- Insulin recommendation based on historical insulin-to-glucose ratio
+- Confidence assessment (High/Medium/Low) based on data quality
+- Safety bounds and warnings (hypo/hyper risk, high variability)
+- Medical disclaimers and clear UI distinction (purple/blue theme)
+
+**Technical Implementation:**
+- New function: `predict_next_window(lookback_days=30)`
+- Helper functions: `_get_next_window_name()`, `_calculate_confidence()`
+- API endpoint: `GET /api/dashboard/prediction?lookback_days=30`
+- Frontend: Prediction section with confidence dots, warnings, disclaimers
+- SQL queries optimized: ORDER BY ASC for time-weighted mean compatibility
+- Fallback to simple average if timestamps are identical
+
+**Files Modified:**
+- `server.py` - Prediction algorithm and API endpoint (+223 lines)
+- `static/css/styles.css` - Prediction section styling (+166 lines)
+- `static/js/dashboard.js` - Load and display prediction (+150 lines)
+- `static/index.html.dev` - Prediction HTML section (+7 lines)
+- `test_server.py` - Prediction API test (+27 lines)
+- Production bundle: v0.8.0 (41.94 KB)
 
 ## v0.7.0 (2026-02-28)
 

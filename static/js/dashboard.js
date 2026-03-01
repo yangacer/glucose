@@ -539,7 +539,7 @@ async function loadPrediction() {
     const container = document.getElementById('predictionContent');
     
     try {
-        const response = await fetch(`${API_BASE}/dashboard/prediction?lookback_days=14`);
+        const response = await fetch(`${API_BASE}/dashboard/prediction?lookback_days=30`);
         
         if (!response.ok) {
             throw new Error('Failed to fetch prediction');
