@@ -201,16 +201,16 @@ def calculate_lbgi(data):
     if len(data) < 1:
         return None
 
-    low_risks = []
+    risk_scores = []
     for _, glucose in data:
-        f_g = calculate_risk_function(glucose)
-        if f_g < 0:
-            rl = 10 * (f_g ** 2)
-            low_risks.append(rl)
+        risk_score = calculate_risk_function(glucose)
+        if risk_score < 0:
+            low_risk = 10 * (risk_score ** 2)
+            risk_scores.append(low_risk)
         else:
-            low_risks.append(0)
+            risk_scores.append(0)
 
-    return sum(low_risks) / len(low_risks) if low_risks else None
+    return sum(risk_scores) / len(risk_scores) if risk_scores else None
 
 
 def calculate_hbgi(data):
@@ -225,16 +225,16 @@ def calculate_hbgi(data):
     if len(data) < 1:
         return None
 
-    high_risks = []
+    risk_scores = []
     for _, glucose in data:
-        f_g = calculate_risk_function(glucose)
-        if f_g > 0:
-            rh = 10 * (f_g ** 2)
-            high_risks.append(rh)
+        risk_score = calculate_risk_function(glucose)
+        if risk_score > 0:
+            high_risk = 10 * (risk_score ** 2)
+            risk_scores.append(high_risk)
         else:
-            high_risks.append(0)
+            risk_scores.append(0)
 
-    return sum(high_risks) / len(high_risks) if high_risks else None
+    return sum(risk_scores) / len(risk_scores) if risk_scores else None
 
 
 def calculate_adrr(glucose_rows, windows):
@@ -261,16 +261,16 @@ def calculate_adrr(glucose_rows, windows):
         daily_data[date_key].append((dt, level))
 
     # Calculate daily risk range for each day
-    daily_rr = []
+    daily_risk_ranges = []
     for date_key in sorted(daily_data.keys()):
         day_data = daily_data[date_key]
         if len(day_data) >= 2:
             lbgi = calculate_lbgi(day_data)
             hbgi = calculate_hbgi(day_data)
             if lbgi is not None and hbgi is not None:
-                daily_rr.append(lbgi + hbgi)
+                daily_risk_ranges.append(lbgi + hbgi)
 
-    return sum(daily_rr) / len(daily_rr) if daily_rr else None
+    return sum(daily_risk_ranges) / len(daily_risk_ranges) if daily_risk_ranges else None
 
 
 def calculate_risk_metric_data(glucose_rows, windows, metric_type):
@@ -285,7 +285,7 @@ def calculate_risk_metric_data(glucose_rows, windows, metric_type):
         List of {'label': str, 'value': float} dicts
     """
     result = []
-    calc_func = calculate_lbgi if metric_type == 'lbgi' else calculate_hbgi
+    metric_calculator = calculate_lbgi if metric_type == 'lbgi' else calculate_hbgi
 
     for label, window_start, window_end in windows:
         window_data = []
@@ -294,7 +294,7 @@ def calculate_risk_metric_data(glucose_rows, windows, metric_type):
                 dt = datetime.strptime(timestamp_str, '%Y-%m-%d %H:%M:%S')
                 window_data.append((dt, level))
 
-        value = calc_func(window_data)
+        value = metric_calculator(window_data)
         result.append({
             'label': label,
             'value': round(value, 2) if value is not None else None
@@ -548,7 +548,7 @@ def get_previous_time_window():
 def process_time_window_summary(cursor, window_icon, date_str, window_start, window_end):
     """Process and aggregate data for a 12-hour time window."""
     # Get all intakes in this window
-    cursor.execute('''SELECT i.timestamp, i.nutrition_kcal, i.nutrition_amount, n.nutrition_name
+    cursor.execute('''SELECT i.timestamp, i.nutrition_kcal, n.nutrition_name
                      FROM intake i
                      JOIN nutrition n ON i.nutrition_id = n.id
                      WHERE i.timestamp BETWEEN ? AND ?
@@ -556,20 +556,18 @@ def process_time_window_summary(cursor, window_icon, date_str, window_start, win
                   (window_start, window_end))
     intakes = cursor.fetchall()
 
-    # Determine reference time for glucose levels
+    # Always use window_start as reference time for glucose levels
+    window_start_dt = datetime.strptime(window_start, '%Y-%m-%d %H:%M:%S')
+
     if intakes:
-        # Use first intake time as reference
         first_intake_time = intakes[0][0]
-        intake_dt = datetime.strptime(first_intake_time, '%Y-%m-%d %H:%M:%S')
 
         # Aggregate nutrition data
         total_kcal = sum(row[1] for row in intakes)
-        nutrition_items = [f"{row[3]} ({row[1]:.1f} kcal)" for row in intakes]
+        nutrition_items = [f"{row[2]} ({row[1]:.1f} kcal)" for row in intakes]
         nutrition_str = ', '.join(nutrition_items)
     else:
-        # No intake, use window start as reference
         first_intake_time = None
-        intake_dt = datetime.strptime(window_start, '%Y-%m-%d %H:%M:%S')
         total_kcal = 0
         nutrition_str = ''
 
@@ -582,8 +580,8 @@ def process_time_window_summary(cursor, window_icon, date_str, window_start, win
     dose_time = insulin_row[0] if insulin_row else None
     dosage = insulin_row[1] if insulin_row else None
 
-    # Get glucose levels based on reference time
-    glucose_levels = get_glucose_levels_around_intake(cursor, intake_dt.strftime('%Y-%m-%d %H:%M:%S'), intake_dt)
+    # Get glucose levels based on window start time
+    glucose_levels = get_glucose_levels_from_window_start(cursor, window_start_dt)
 
     # Get events in window
     cursor.execute('''SELECT event_name FROM event
@@ -622,29 +620,17 @@ def process_time_window_summary(cursor, window_icon, date_str, window_start, win
     }
 
 
-def get_glucose_levels_around_intake(cursor, first_intake_time, intake_dt):
-    """Get glucose levels at and after intake (0 to 11 hours)."""
+def get_glucose_levels_from_window_start(cursor, window_start_dt):
+    """Get average glucose levels in each 1-hour bucket from window start (0 to 11 hours)."""
     glucose_levels = {}
 
-    # +0: Most recent glucose before or at intake time
-    cursor.execute('''SELECT level FROM glucose
-                     WHERE timestamp <= ?
-                     ORDER BY timestamp DESC LIMIT 1''',
-                  (first_intake_time,))
-    zero_row = cursor.fetchone()
-    glucose_levels['+0'] = zero_row[0] if zero_row else None
-
-    # +1 to +11: Average glucose in ±30min window after intake
-    for hour in range(1, 12):
-        target_time = intake_dt + timedelta(hours=hour)
-
-        # Get average glucose in ±30min window
-        window_start_time = (target_time - timedelta(minutes=30)).strftime('%Y-%m-%d %H:%M:%S')
-        window_end_time = (target_time + timedelta(minutes=30)).strftime('%Y-%m-%d %H:%M:%S')
+    for hour in range(12):
+        bucket_start = (window_start_dt + timedelta(hours=hour)).strftime('%Y-%m-%d %H:%M:%S')
+        bucket_end = (window_start_dt + timedelta(hours=hour + 1)).strftime('%Y-%m-%d %H:%M:%S')
 
         cursor.execute('''SELECT AVG(level) FROM glucose
-                         WHERE timestamp BETWEEN ? AND ?''',
-                      (window_start_time, window_end_time))
+                         WHERE timestamp >= ? AND timestamp < ?''',
+                      (bucket_start, bucket_end))
         avg_row = cursor.fetchone()
         glucose_levels[f'+{hour}'] = round(avg_row[0], 1) if avg_row[0] else None
 
@@ -855,8 +841,8 @@ def _calculate_confidence(data_points, cv, std_dev, values):
     """Calculate confidence level for prediction."""
     # Check for stable recent trend (last 5 readings)
     if len(values) >= 5:
-        recent = values[:5]
-        recent_std = math.sqrt(sum((x - sum(recent)/len(recent)) ** 2 for x in recent) / len(recent))
+        recent_values = values[:5]
+        recent_std = math.sqrt(sum((x - sum(recent_values)/len(recent_values)) ** 2 for x in recent_values) / len(recent_values))
         stable_trend = recent_std < std_dev * 0.8
     else:
         stable_trend = False
@@ -1137,8 +1123,8 @@ class GlucoseHandler(http.server.SimpleHTTPRequestHandler):
     def do_PUT(self):
         try:
             content_length = int(self.headers['Content-Length'])
-            post_data = self.rfile.read(content_length)
-            data = json.loads(post_data.decode('utf-8'))
+            raw_body = self.rfile.read(content_length)
+            data = json.loads(raw_body.decode('utf-8'))
         except (ValueError, json.JSONDecodeError) as e:
             self._send_error_json(f'Invalid JSON: {str(e)}', 400)
             return

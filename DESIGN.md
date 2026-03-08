@@ -292,7 +292,7 @@ CV = (Standard Deviation / Time-Weighted Mean) × 100
 - Window indicator (☀️ or 🌙)
 - Date
 - Insulin dosage (sum for window)
-- Glucose levels at hourly intervals (+0 through +11)
+- Glucose levels at hourly intervals (+0 through +11), each representing a 1-hour bucket anchored at window start
 - Total kCal intake
 
 **Glucose Color Coding:**
