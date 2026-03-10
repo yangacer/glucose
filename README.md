@@ -31,3 +31,36 @@ functionality of the application. Please do not use these visualizations for
 clinical decision-making or any real-world applications. Always consult with a
 healthcare professional for accurate medical advice and information.
 
+# Development
+
+## Required Tools
+
+- Python 3.8+
+- terser: For minifying JavaScript
+
+## Backend
+
+All backend code is located in the `server.py` file. It intentionally uses only
+the Python standard library to minimize dependencies and simplify deployment.
+
+## Frontend
+
+Frontend assets are located in the `static/` directory. The main entry point is
+`static/index.html.dev`, which loads the necessary JavaScript and CSS files.
+To minify JavaScript files for production, run the following command:
+
+```bash
+./build-js.sh x.y.z
+```
+
+where `x.y.z` is the version number to embed in the JavaScript code. This will
+generate minified files in the `static/release/` directory and generate
+`static/index.html` that references the minified assets.
+
+When `MTLS_ENABLED` is set to `false`, the server will serve the
+`static/index.html.dev` file, which references the unminified JavaScript files
+for easier debugging during development.
+
+When `MTLS_ENABLED` is set to `true`, the server will serve the
+`static/index.html` file, which references the minified JavaScript files for
+production use.
