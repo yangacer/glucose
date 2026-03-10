@@ -82,19 +82,24 @@ function populateSupplementSelect(select, data) {
         const option = document.createElement('option');
         option.value = item.id;
         option.textContent = item.supplement_name;
-        option.dataset.defaultAmount = item.default_amount;
+        option.dataset.defaultAmount = item.default_amount ?? '';
         select.appendChild(option);
     });
-    
-    // Auto-fill default amount when supplement is selected
-    select.addEventListener('change', function() {
+
+    // Remove any previously attached listener to avoid duplicates on re-population
+    if (select._supplementChangeHandler) {
+        select.removeEventListener('change', select._supplementChangeHandler);
+    }
+    select._supplementChangeHandler = function() {
         const selectedOption = this.options[this.selectedIndex];
         const defaultAmount = selectedOption.dataset.defaultAmount;
         if (defaultAmount) {
-            const amountInput = this.closest('.supplement-item').querySelector('input[name="supplement_amount[]"]');
-            amountInput.value = defaultAmount;
+            const supplementItem = this.closest('.supplement-item');
+            const amountInput = supplementItem?.querySelector('input[name="supplement_amount[]"]');
+            if (amountInput) amountInput.value = defaultAmount;
         }
-    });
+    };
+    select.addEventListener('change', select._supplementChangeHandler);
 }
 
 /**
