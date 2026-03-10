@@ -67,6 +67,7 @@ function initializeForms() {
         if (result.success) {
             e.target.reset();
             e.target.querySelector('input[name="default_amount"]').value = '1';
+            invalidateOptionCaches();
             loadSupplementsList();
         }
     });
@@ -111,6 +112,7 @@ function initializeForms() {
         showMessage('nutrition-message', result.success, result.message);
         if (result.success) {
             e.target.reset();
+            invalidateOptionCaches();
             loadNutritionList();
             loadNutritionAudit();
         }
