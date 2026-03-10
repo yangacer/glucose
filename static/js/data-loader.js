@@ -1,48 +1,13 @@
 // Data loading functionality
 
-// Promise caches: concurrent callers share one in-flight request instead of each
-// firing their own fetch. Set to null to invalidate (e.g. after saving new items).
-let _supplementOptionsPromise = null;
-let _nutritionOptionsPromise = null;
-
-function fetchSupplementData() {
-    if (!_supplementOptionsPromise) {
-        _supplementOptionsPromise = fetch(`${API_BASE}/supplements`)
-            .then(r => r.json())
-            .catch(err => {
-                _supplementOptionsPromise = null;
-                throw err;
-            });
-    }
-    return _supplementOptionsPromise;
-}
-
-function fetchNutritionData() {
-    if (!_nutritionOptionsPromise) {
-        _nutritionOptionsPromise = fetch(`${API_BASE}/nutrition`)
-            .then(r => r.json())
-            .catch(err => {
-                _nutritionOptionsPromise = null;
-                throw err;
-            });
-    }
-    return _nutritionOptionsPromise;
-}
-
-/**
- * Invalidate caches so the next load fetches fresh data from the server.
- */
-function invalidateOptionCaches() {
-    _supplementOptionsPromise = null;
-    _nutritionOptionsPromise = null;
-}
-
 /**
  * Load nutrition options for all nutrition selects
  */
 async function loadNutritionOptions() {
     try {
-        const data = await fetchNutritionData();
+        const response = await fetch(`${API_BASE}/nutrition`);
+        const data = await response.json();
+        
         const selects = document.querySelectorAll('.nutrition-select');
         selects.forEach(select => {
             populateNutritionSelect(select, data);
@@ -57,7 +22,8 @@ async function loadNutritionOptions() {
  */
 async function loadNutritionOptionsForSelect(selectElement) {
     try {
-        const data = await fetchNutritionData();
+        const response = await fetch(`${API_BASE}/nutrition`);
+        const data = await response.json();
         populateNutritionSelect(selectElement, data);
     } catch (err) {
         console.error('Failed to load nutrition options:', err);
@@ -82,7 +48,9 @@ function populateNutritionSelect(select, data) {
  */
 async function loadSupplementOptions() {
     try {
-        const data = await fetchSupplementData();
+        const response = await fetch(`${API_BASE}/supplements`);
+        const data = await response.json();
+        
         const selects = document.querySelectorAll('.supplement-select');
         selects.forEach(select => {
             populateSupplementSelect(select, data);
@@ -97,7 +65,8 @@ async function loadSupplementOptions() {
  */
 async function loadSupplementOptionsForSelect(selectElement) {
     try {
-        const data = await fetchSupplementData();
+        const response = await fetch(`${API_BASE}/supplements`);
+        const data = await response.json();
         populateSupplementSelect(selectElement, data);
     } catch (err) {
         console.error('Failed to load supplement options:', err);
