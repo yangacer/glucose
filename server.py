@@ -523,9 +523,10 @@ def calculate_cv_data(glucose_rows, windows):
     return result
 
 
-def get_previous_time_window():
-    """Calculate previous 12-hour time window."""
-    now = datetime.now()
+def get_previous_time_window(now=None):
+    """Calculate previous 12-hour time window relative to `now` (defaults to server local time)."""
+    if now is None:
+        now = datetime.now()
     current_hour = now.hour
 
     if 5 <= current_hour < 17:  # Current is Day (05:00-16:59), previous is Night
@@ -1055,7 +1056,7 @@ class GlucoseHandler(http.server.SimpleHTTPRequestHandler):
             route_handlers = {
                 '/api/nutrition': lambda: self._send_json(DataAccess.get_nutrition_list()),
                 '/api/supplements': lambda: self._send_json(DataAccess.get_supplements_list()),
-                '/api/intake/previous-window': self.handle_get_previous_window_intake,
+                '/api/intake/previous-window': lambda: self.handle_get_previous_window_intake(query_params),
                 '/api/glucose': lambda: self.handle_get_list('glucose', query_params),
                 '/api/insulin': lambda: self.handle_get_list('insulin', query_params),
                 '/api/intake': lambda: self.handle_get_intake_list(query_params),
@@ -1256,8 +1257,14 @@ class GlucoseHandler(http.server.SimpleHTTPRequestHandler):
                    'event_notes': row[3]} for row in rows]
         self._send_json(records)
 
-    def handle_get_previous_window_intake(self):
-        prev_start, prev_end = get_previous_time_window()
+    def handle_get_previous_window_intake(self, query_params):
+        client_now = None
+        if 'now' in query_params:
+            try:
+                client_now = datetime.fromisoformat(query_params['now'][0])
+            except ValueError:
+                pass
+        prev_start, prev_end = get_previous_time_window(client_now)
 
         with get_db_connection() as conn:
             cursor = conn.cursor()

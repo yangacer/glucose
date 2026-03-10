@@ -203,7 +203,9 @@ function attachSupplementsListListeners(container) {
  */
 async function autofillPreviousIntake() {
     try {
-        const response = await fetch(`${API_BASE}/intake/previous-window`);
+        const now = new Date();
+        const localNow = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}T${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`;
+        const response = await fetch(`${API_BASE}/intake/previous-window?now=${encodeURIComponent(localNow)}`);
         const data = await response.json();
         
         const nutritionData = data.nutrition || [];
