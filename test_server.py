@@ -355,7 +355,7 @@ class TestGlucoseAPI(unittest.TestCase):
         self.make_request('POST', '/api/intake', data)
         
         # Get previous window intake
-        status, response = self.make_request('GET', '/api/intake/previous-window')
+        status, response = self.make_request('GET', '/api/intake/previous-window?tz=UTC')
         self.assertEqual(status, 200)
         self.assertIsInstance(response, dict)
         self.assertIn('nutrition', response)
@@ -386,7 +386,7 @@ class TestGlucoseAPI(unittest.TestCase):
         start_date = f'{today.year}-{today.month:02d}-01'
         end_date = today.strftime('%Y-%m-%d')
         
-        status, response = self.make_request('GET', f'/api/dashboard/summary?start_date={start_date}&end_date={end_date}')
+        status, response = self.make_request('GET', f'/api/dashboard/summary?start_date={start_date}&end_date={end_date}&tz=UTC')
         self.assertEqual(status, 200)
         self.assertIsInstance(response, list)
         
@@ -534,19 +534,19 @@ class TestGlucoseAPI(unittest.TestCase):
         
         end_date = date(2026, 2, 26)
         
-        windows_12h = generate_cv_windows(end_date, 7, 12)
+        windows_12h = generate_cv_windows(end_date, 7, 12, 'UTC')
         self.assertGreater(len(windows_12h), 0)
         self.assertEqual(len(windows_12h), 14)
         
-        windows_48h = generate_cv_windows(end_date, 30, 48)
+        windows_48h = generate_cv_windows(end_date, 30, 48, 'UTC')
         self.assertGreater(len(windows_48h), 0)
         
-        windows_5d = generate_cv_windows(end_date, 30, 120)
+        windows_5d = generate_cv_windows(end_date, 30, 120, 'UTC')
         self.assertGreater(len(windows_5d), 0)
     
     def test_25_cv_charts_api(self):
         """Test CV charts API endpoint"""
-        status, data = self.make_request('GET', '/api/dashboard/cv-charts?end_date=2026-02-26')
+        status, data = self.make_request('GET', '/api/dashboard/cv-charts?end_date=2026-02-26&tz=UTC')
         self.assertEqual(status, 200)
         
         self.assertIn('cv_7d_12h', data)
@@ -598,7 +598,7 @@ class TestGlucoseAPI(unittest.TestCase):
     
     def test_27_risk_metrics_api(self):
         """Test risk metrics API endpoint"""
-        status, data = self.make_request('GET', '/api/dashboard/risk-metrics?end_date=2026-02-26')
+        status, data = self.make_request('GET', '/api/dashboard/risk-metrics?end_date=2026-02-26&tz=UTC')
         self.assertEqual(status, 200)
         
         # Check all LBGI charts
@@ -627,7 +627,7 @@ class TestGlucoseAPI(unittest.TestCase):
     
     def test_28_prediction_api(self):
         """Test prediction API endpoint"""
-        status, data = self.make_request('GET', '/api/dashboard/prediction?lookback_days=14')
+        status, data = self.make_request('GET', '/api/dashboard/prediction?lookback_days=14&tz=UTC')
         self.assertEqual(status, 200)
         
         # Check required fields

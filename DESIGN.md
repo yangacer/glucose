@@ -376,6 +376,36 @@ Click outside overlay to dismiss.
 
 ---
 
+## Timezone Support
+
+### Asymmetric Timezone Design
+
+**Purpose:** Allow the server and clients to operate in different timezones without data misalignment.
+
+**Approach:** Store all timestamps in UTC. Clients declare their local timezone on each request; the server converts accordingly.
+
+**Rules:**
+- All timestamps stored in the database are UTC
+- Clients submit timestamps converted to UTC before sending
+- Clients display timestamps converted from UTC to their local time
+- The server is timezone-agnostic — it never assumes a local timezone
+
+**`tz` Parameter:**
+- **Required** for all window-anchored endpoints (cv-charts, risk-metrics, summary, prediction, previous-window intake)
+- Missing or invalid `tz` returns HTTP 400
+- **Optional** for simple list endpoints (glucose, insulin, intake, etc.) — falls back to UTC if omitted
+
+**Client Behaviour:**
+- Timezone auto-detected via `Intl.DateTimeFormat().resolvedOptions().timeZone`
+- Timestamps entered in local time, converted to UTC before submission
+- Timestamps received from server displayed in browser local time
+
+**Migration:**
+- Existing data recorded in server local time must be migrated once using `migration-utc.py` before deploying timezone-aware code
+- See `ASYMMETRIC_TIMEZONE.md` for full approach and migration instructions
+
+---
+
 ## Security
 
 ### Mutual TLS (mTLS)

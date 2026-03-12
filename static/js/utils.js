@@ -76,7 +76,7 @@ function getCurrentTimestamp() {
  * @returns {string} Database timestamp format
  */
 function toDbTimestamp(datetimeLocal) {
-    return datetimeLocal.replace('T', ' ') + ':00';
+    return new Date(datetimeLocal).toISOString().replace('T', ' ').slice(0, 19);
 }
 
 /**
@@ -160,7 +160,31 @@ function resetButton(button) {
  * @returns {string} Datetime local format (YYYY-MM-DDTHH:MM)
  */
 function toInputTimestamp(dbTimestamp) {
-    return dbTimestamp.substring(0, 16).replace(' ', 'T');
+    // dbTimestamp is UTC; convert to browser local time for datetime-local inputs
+    const d = new Date(dbTimestamp.replace(' ', 'T') + 'Z');
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    const hours = String(d.getHours()).padStart(2, '0');
+    const minutes = String(d.getMinutes()).padStart(2, '0');
+    return `${year}-${month}-${day}T${hours}:${minutes}`;
+}
+
+/**
+ * Format a UTC database timestamp for display in the browser's local time
+ * @param {string} utcStr - UTC timestamp (YYYY-MM-DD HH:MM:SS)
+ * @returns {string} Localised display string
+ */
+function formatTimestamp(utcStr) {
+    return new Date(utcStr.replace(' ', 'T') + 'Z').toLocaleString();
+}
+
+/**
+ * Return the browser's IANA timezone name
+ * @returns {string} e.g. "Asia/Taipei"
+ */
+function getClientTz() {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone;
 }
 
 /**

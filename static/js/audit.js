@@ -7,9 +7,9 @@ async function loadGlucoseAudit() {
     const startDate = document.getElementById('glucose-start-filter').value;
     const endDate = document.getElementById('glucose-end-filter').value;
     
-    let url = `${API_BASE}/glucose`;
+    let url = `${API_BASE}/glucose?tz=${encodeURIComponent(getClientTz())}`;
     if (startDate && endDate) {
-        url += `?start_date=${startDate}&end_date=${endDate}`;
+        url += `&start_date=${startDate}&end_date=${endDate}`;
     }
     
     const response = await fetch(url);
@@ -22,7 +22,7 @@ async function loadGlucoseAudit() {
         const tr = document.createElement('tr');
         tr.innerHTML = `
             <td>${record.id}</td>
-            <td>${record.timestamp}</td>
+            <td>${formatTimestamp(record.timestamp)}</td>
             <td>${record.level}</td>
             <td>
                 <button class="edit-btn" onclick="editGlucose(${record.id}, '${record.timestamp}', ${record.level})">Edit</button>
@@ -37,7 +37,7 @@ async function loadGlucoseAudit() {
  * Edit glucose record
  */
 async function editGlucose(id, timestamp, level) {
-    const newTimestamp = prompt('Enter new timestamp (YYYY-MM-DD HH:MM:SS):', timestamp);
+    const newTimestamp = prompt('Enter new timestamp (local time, YYYY-MM-DDTHH:MM):', toInputTimestamp(timestamp));
     const newLevel = prompt('Enter new glucose level:', level);
     
     if (newTimestamp && newLevel) {
@@ -45,7 +45,7 @@ async function editGlucose(id, timestamp, level) {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                timestamp: newTimestamp,
+                timestamp: toDbTimestamp(newTimestamp),
                 level: parseInt(newLevel)
             })
         });
@@ -84,9 +84,9 @@ async function loadInsulinAudit() {
     const startDate = document.getElementById('insulin-start-filter').value;
     const endDate = document.getElementById('insulin-end-filter').value;
     
-    let url = `${API_BASE}/insulin`;
+    let url = `${API_BASE}/insulin?tz=${encodeURIComponent(getClientTz())}`;
     if (startDate && endDate) {
-        url += `?start_date=${startDate}&end_date=${endDate}`;
+        url += `&start_date=${startDate}&end_date=${endDate}`;
     }
     
     const response = await fetch(url);
@@ -99,7 +99,7 @@ async function loadInsulinAudit() {
         const tr = document.createElement('tr');
         tr.innerHTML = `
             <td>${record.id}</td>
-            <td>${record.timestamp}</td>
+            <td>${formatTimestamp(record.timestamp)}</td>
             <td>${record.level}</td>
             <td>
                 <button class="edit-btn" onclick="editInsulin(${record.id}, '${record.timestamp}', ${record.level})">Edit</button>
@@ -114,7 +114,7 @@ async function loadInsulinAudit() {
  * Edit insulin record
  */
 async function editInsulin(id, timestamp, level) {
-    const newTimestamp = prompt('Enter new timestamp (YYYY-MM-DD HH:MM:SS):', timestamp);
+    const newTimestamp = prompt('Enter new timestamp (local time, YYYY-MM-DDTHH:MM):', toInputTimestamp(timestamp));
     const newLevel = prompt('Enter new insulin level:', level);
     
     if (newTimestamp && newLevel) {
@@ -122,7 +122,7 @@ async function editInsulin(id, timestamp, level) {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                timestamp: newTimestamp,
+                timestamp: toDbTimestamp(newTimestamp),
                 level: parseFloat(newLevel)
             })
         });
@@ -161,9 +161,9 @@ async function loadIntakeAudit() {
     const startDate = document.getElementById('intake-start-filter').value;
     const endDate = document.getElementById('intake-end-filter').value;
     
-    let url = `${API_BASE}/intake`;
+    let url = `${API_BASE}/intake?tz=${encodeURIComponent(getClientTz())}`;
     if (startDate && endDate) {
-        url += `?start_date=${startDate}&end_date=${endDate}`;
+        url += `&start_date=${startDate}&end_date=${endDate}`;
     }
     
     const response = await fetch(url);
@@ -176,7 +176,7 @@ async function loadIntakeAudit() {
         const tr = document.createElement('tr');
         tr.innerHTML = `
             <td>${record.id}</td>
-            <td>${record.timestamp}</td>
+            <td>${formatTimestamp(record.timestamp)}</td>
             <td>${record.nutrition_name}</td>
             <td>${record.nutrition_amount}</td>
             <td>${record.nutrition_kcal.toFixed(1)}</td>
@@ -300,9 +300,9 @@ async function loadSupplementIntakeAudit() {
     const startDate = document.getElementById('supplement-intake-start-filter').value;
     const endDate = document.getElementById('supplement-intake-end-filter').value;
     
-    let url = `${API_BASE}/supplement-intake`;
+    let url = `${API_BASE}/supplement-intake?tz=${encodeURIComponent(getClientTz())}`;
     if (startDate && endDate) {
-        url += `?start_date=${startDate}&end_date=${endDate}`;
+        url += `&start_date=${startDate}&end_date=${endDate}`;
     }
     
     const response = await fetch(url);
@@ -315,7 +315,7 @@ async function loadSupplementIntakeAudit() {
         const tr = document.createElement('tr');
         tr.innerHTML = `
             <td>${record.id}</td>
-            <td>${record.timestamp}</td>
+            <td>${formatTimestamp(record.timestamp)}</td>
             <td>${record.supplement_name}</td>
             <td>${record.supplement_amount}</td>
             <td>
@@ -351,9 +351,9 @@ async function loadEventAudit() {
     const startDate = document.getElementById('event-start-filter').value;
     const endDate = document.getElementById('event-end-filter').value;
     
-    let url = `${API_BASE}/event`;
+    let url = `${API_BASE}/event?tz=${encodeURIComponent(getClientTz())}`;
     if (startDate && endDate) {
-        url += `?start_date=${startDate}&end_date=${endDate}`;
+        url += `&start_date=${startDate}&end_date=${endDate}`;
     }
     
     const response = await fetch(url);
@@ -366,7 +366,7 @@ async function loadEventAudit() {
         const tr = document.createElement('tr');
         tr.innerHTML = `
             <td>${record.id}</td>
-            <td>${record.timestamp}</td>
+            <td>${formatTimestamp(record.timestamp)}</td>
             <td>${record.event_name}</td>
             <td>${record.event_notes || ''}</td>
             <td>

@@ -472,6 +472,72 @@ async (e) => {
 
 ---
 
+# Timezone Handling
+
+## Overview
+
+All timestamps are stored in UTC. Clients declare their IANA timezone via a
+`tz` query parameter; the server converts accordingly. See `ASYMMETRIC_TIMEZONE.md`
+for the full design rationale.
+
+## Server Helpers
+
+**File:** `server.py`
+
+**Functions:**
+
+| Function | Purpose |
+|---|---|
+| `parse_tz(query_params, required)` | Extracts and validates IANA `tz` param; raises `ValueError` → HTTP 400 if required and missing/invalid |
+| `to_utc_range(date_str, tz_name)` | Converts local `YYYY-MM-DD` to UTC `(start_inclusive, end_exclusive)` string pair |
+| `local_5am_utc(d, tz_name)` | Returns 5:00 AM local time on date `d` as a UTC-aware `datetime` |
+| `today_in_tz(tz_name)` | Returns today's `date` in the client's timezone |
+
+**`tz` parameter rules:**
+- **Required** (HTTP 400 if missing): `cv-charts`, `risk-metrics`, `summary`, `prediction`, `intake/previous-window`
+- **Optional** (falls back to UTC): all list endpoints (`glucose`, `insulin`, `intake`, `supplement-intake`, `event`)
+
+## Window-Anchored Functions
+
+All functions that define 12-hour or multi-day windows accept `tz_name`:
+
+- `generate_cv_windows(end_date, days, window_hours, tz_name)` — anchor is `local_5am_utc(end_date, tz_name)`; window boundary strings are UTC; labels converted back to local for readability
+- `get_previous_time_window(tz_name)` — converts `datetime.now(UTC)` to client local, determines previous window, returns UTC boundary strings
+- `predict_next_window(lookback_days, tz_name)` — uses `datetime.now(UTC)` for lookback; passes local time to `_get_next_window_name()`
+
+## Frontend
+
+**File:** `static/js/utils.js`
+
+| Function | Purpose |
+|---|---|
+| `getClientTz()` | Returns browser IANA timezone via `Intl.DateTimeFormat().resolvedOptions().timeZone` |
+| `toDbTimestamp(datetimeLocal)` | Converts `datetime-local` input value → UTC string via `new Date().toISOString()` |
+| `toInputTimestamp(utcStr)` | Converts UTC DB string → `datetime-local` format in browser local time |
+| `formatTimestamp(utcStr)` | Converts UTC DB string → localised display string via `toLocaleString()` |
+
+All API calls in `audit.js`, `dashboard.js`, and `data-loader.js` append
+`&tz=${encodeURIComponent(getClientTz())}`.
+
+## Migration
+
+**Script:** `migration-utc.py`
+
+One-time conversion of existing local-time data to UTC before deploying:
+
+```bash
+# Dry run
+python3 migration-utc.py --db glucose.db --from-tz Asia/Taipei
+
+# Apply
+python3 migration-utc.py --db glucose.db --from-tz Asia/Taipei --apply
+```
+
+Idempotent: records applied migrations in a `_migrations` table and refuses
+to run the same migration twice.
+
+---
+
 # mTLS Security
 
 ## Implementation

@@ -59,7 +59,7 @@ async function loadGlucoseChart() {
     const endDate = document.getElementById('chart-end-date').value;
     
     try {
-        const response = await fetch(`${API_BASE}/dashboard/glucose-chart?start_date=${startDate}&end_date=${endDate}`);
+        const response = await fetch(`${API_BASE}/dashboard/glucose-chart?start_date=${startDate}&end_date=${endDate}&tz=${encodeURIComponent(getClientTz())}`);
         const data = await response.json();
         
         const ctx = document.getElementById('glucoseChart').getContext('2d');
@@ -142,7 +142,7 @@ async function loadSummary() {
     const endDate = document.getElementById('summary-end-date').value;
     
     try {
-        const response = await fetch(`${API_BASE}/dashboard/summary?start_date=${startDate}&end_date=${endDate}`);
+        const response = await fetch(`${API_BASE}/dashboard/summary?start_date=${startDate}&end_date=${endDate}&tz=${encodeURIComponent(getClientTz())}`);
         const data = await response.json();
         
         const tbody = document.getElementById('summaryBody');
@@ -272,7 +272,7 @@ async function loadCVCharts() {
     const endDate = document.getElementById('cv-end-date').value;
     
     try {
-        const response = await fetch(`${API_BASE}/dashboard/cv-charts?end_date=${endDate}`);
+        const response = await fetch(`${API_BASE}/dashboard/cv-charts?end_date=${endDate}&tz=${encodeURIComponent(getClientTz())}`);
         const data = await response.json();
         
         renderCVChart('cvChart7d12h', data.cv_7d_12h, cvChart7d12h);
@@ -380,7 +380,7 @@ async function loadCVCharts() {
     const endDate = document.getElementById('cv-end-date').value;
     
     try {
-        const response = await fetch(`${API_BASE}/dashboard/cv-charts?end_date=${endDate}`);
+        const response = await fetch(`${API_BASE}/dashboard/cv-charts?end_date=${endDate}&tz=${encodeURIComponent(getClientTz())}`);
         const data = await response.json();
         
         renderCVChart('cvChart7d12h', data.cv_7d_12h, cvChart7d12h);
@@ -398,7 +398,7 @@ async function loadRiskMetrics() {
     const endDate = document.getElementById('risk-end-date').value;
     
     try {
-        const response = await fetch(`${API_BASE}/dashboard/risk-metrics?end_date=${endDate}`);
+        const response = await fetch(`${API_BASE}/dashboard/risk-metrics?end_date=${endDate}&tz=${encodeURIComponent(getClientTz())}`);
         const data = await response.json();
         
         // Render LBGI charts (adjusted for cats)
@@ -539,7 +539,7 @@ async function loadPrediction() {
     const container = document.getElementById('predictionContent');
     
     try {
-        const response = await fetch(`${API_BASE}/dashboard/prediction?lookback_days=30`);
+        const response = await fetch(`${API_BASE}/dashboard/prediction?lookback_days=30&tz=${encodeURIComponent(getClientTz())}`);
         
         if (!response.ok) {
             throw new Error('Failed to fetch prediction');

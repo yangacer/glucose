@@ -6,8 +6,9 @@ import json
 import sqlite3
 import urllib.parse
 import math
-from datetime import datetime, date, timedelta
+from datetime import datetime, date, timedelta, timezone, time as dt_time
 from contextlib import contextmanager
+from zoneinfo import ZoneInfo
 import os
 import ssl
 from collections import defaultdict
@@ -52,6 +53,48 @@ def execute_query(query, params=(), fetch_one=False, commit=False):
             result = cursor.fetchall()
 
         return result
+
+
+# ============================================================================
+# Timezone Helpers
+# ============================================================================
+
+def parse_tz(query_params: dict, required: bool = True) -> str:
+    """Extract and validate an IANA timezone name from query params."""
+    tz_values = query_params.get('tz', [])
+    if not tz_values or not tz_values[0]:
+        if required:
+            raise ValueError("Missing required 'tz' parameter")
+        return 'UTC'
+    try:
+        ZoneInfo(tz_values[0])
+        return tz_values[0]
+    except Exception:
+        raise ValueError(f"Invalid timezone: '{tz_values[0]}'")
+
+
+def to_utc_range(date_str: str, tz_name: str) -> tuple:
+    """Convert a local YYYY-MM-DD to a UTC (start_inclusive, end_exclusive) string pair."""
+    tz = ZoneInfo(tz_name)
+    parts = [int(p) for p in date_str.split('-')]
+    local_start = datetime(*parts, tzinfo=tz)
+    local_end = local_start + timedelta(days=1)
+    fmt = '%Y-%m-%d %H:%M:%S'
+    return (
+        local_start.astimezone(timezone.utc).strftime(fmt),
+        local_end.astimezone(timezone.utc).strftime(fmt),
+    )
+
+
+def local_5am_utc(d: date, tz_name: str) -> datetime:
+    """Return 5:00 AM local time on date d as a UTC-aware datetime."""
+    tz = ZoneInfo(tz_name)
+    return datetime.combine(d, dt_time(5, 0), tzinfo=tz).astimezone(timezone.utc)
+
+
+def today_in_tz(tz_name: str) -> date:
+    """Return today's date in the given client timezone."""
+    return datetime.now(timezone.utc).astimezone(ZoneInfo(tz_name)).date()
 
 
 # ============================================================================
@@ -102,50 +145,6 @@ def calculate_cv(data):
         return None
 
     return (std_dev / time_weighted_mean) * 100
-
-
-def generate_cv_windows(end_date, days, window_hours):
-    """Generate time windows for CV calculation.
-
-    Args:
-        end_date: End date (datetime.date)
-        days: Number of days to look back
-        window_hours: Window size in hours (12, 48, or 120)
-
-    Returns:
-        List of (window_label, window_start, window_end) tuples
-    """
-    windows = []
-    anchor_time = datetime.combine(end_date, datetime.min.time()) + timedelta(hours=5)
-
-    current_window_end = anchor_time
-
-    while True:
-        window_start = current_window_end - timedelta(hours=window_hours)
-
-        days_back = (anchor_time - window_start).total_seconds() / 86400
-        if days_back > days:
-            break
-
-        if window_hours == 12:
-            if window_start.hour == 5:
-                label = f"{window_start.strftime('%Y-%m-%d')} Day"
-            else:
-                label = f"{window_start.strftime('%Y-%m-%d')} Night"
-        elif window_hours == 48:
-            label = f"{window_start.strftime('%Y-%m-%d')} to {current_window_end.strftime('%Y-%m-%d')}"
-        else:
-            label = f"{window_start.strftime('%Y-%m-%d')} to {current_window_end.strftime('%Y-%m-%d')}"
-
-        windows.append((
-            label,
-            window_start.strftime('%Y-%m-%d %H:%M:%S'),
-            current_window_end.strftime('%Y-%m-%d %H:%M:%S')
-        ))
-
-        current_window_end = window_start
-
-    return list(reversed(windows))
 
 
 def calculate_cv_data(glucose_rows, windows):
@@ -451,19 +450,20 @@ def calculate_cv(data):
     return (std_dev / time_weighted_mean) * 100
 
 
-def generate_cv_windows(end_date, days, window_hours):
+def generate_cv_windows(end_date, days, window_hours, tz_name):
     """Generate time windows for CV calculation.
 
     Args:
-        end_date: End date (datetime.date)
+        end_date: End date (datetime.date) in the client's local timezone
         days: Number of days to look back
         window_hours: Window size in hours (12, 48, or 120)
+        tz_name: IANA timezone name of the client
 
     Returns:
-        List of (window_label, window_start, window_end) tuples
+        List of (window_label, window_start_utc, window_end_utc) tuples
     """
     windows = []
-    anchor_time = datetime.combine(end_date, datetime.min.time()) + timedelta(hours=5)
+    anchor_time = local_5am_utc(end_date, tz_name)
 
     current_window_end = anchor_time
 
@@ -475,14 +475,15 @@ def generate_cv_windows(end_date, days, window_hours):
             break
 
         if window_hours == 12:
-            if window_start.hour == 5:
-                label = f"{window_start.strftime('%Y-%m-%d')} Day"
+            local_start = window_start.astimezone(ZoneInfo(tz_name))
+            if local_start.hour == 5:
+                label = f"{local_start.strftime('%Y-%m-%d')} Day"
             else:
-                label = f"{window_start.strftime('%Y-%m-%d')} Night"
-        elif window_hours == 48:
-            label = f"{window_start.strftime('%Y-%m-%d')} to {current_window_end.strftime('%Y-%m-%d')}"
+                label = f"{local_start.strftime('%Y-%m-%d')} Night"
         else:
-            label = f"{window_start.strftime('%Y-%m-%d')} to {current_window_end.strftime('%Y-%m-%d')}"
+            local_start = window_start.astimezone(ZoneInfo(tz_name))
+            local_end = current_window_end.astimezone(ZoneInfo(tz_name))
+            label = f"{local_start.strftime('%Y-%m-%d')} to {local_end.strftime('%Y-%m-%d')}"
 
         windows.append((
             label,
@@ -493,7 +494,6 @@ def generate_cv_windows(end_date, days, window_hours):
         current_window_end = window_start
 
     return list(reversed(windows))
-
 
 def calculate_cv_data(glucose_rows, windows):
     """Calculate CV for each time window.
@@ -523,27 +523,30 @@ def calculate_cv_data(glucose_rows, windows):
     return result
 
 
-def get_previous_time_window(now=None):
-    """Calculate previous 12-hour time window relative to `now` (defaults to server local time)."""
-    if now is None:
-        now = datetime.now()
-    current_hour = now.hour
+def get_previous_time_window(tz_name: str) -> tuple:
+    """Calculate previous 12-hour time window in UTC for the given client timezone."""
+    tz = ZoneInfo(tz_name)
+    now_local = datetime.now(timezone.utc).astimezone(tz)
+    current_hour = now_local.hour
+    fmt = '%Y-%m-%d %H:%M:%S'
+
+    def to_utc_str(dt_local):
+        return dt_local.astimezone(timezone.utc).strftime(fmt)
 
     if 5 <= current_hour < 17:  # Current is Day (05:00-16:59), previous is Night
-        # Previous night window: 17:00 yesterday to 04:59 today
-        prev_start = (now - timedelta(days=1)).strftime('%Y-%m-%d') + ' 17:00:00'
-        prev_end = now.strftime('%Y-%m-%d') + ' 04:59:59'
-    else:  # Current is Night (17:00-04:59), previous is Day
-        if current_hour >= 17:  # Evening (17:00-23:59)
-            # Previous day window: 05:00 to 16:59 today
-            prev_start = now.strftime('%Y-%m-%d') + ' 05:00:00'
-            prev_end = now.strftime('%Y-%m-%d') + ' 16:59:59'
-        else:  # Early morning (00:00-04:59)
-            # Previous day window: 05:00 to 16:59 yesterday
-            prev_start = (now - timedelta(days=1)).strftime('%Y-%m-%d') + ' 05:00:00'
-            prev_end = (now - timedelta(days=1)).strftime('%Y-%m-%d') + ' 16:59:59'
+        # Previous night: 17:00 yesterday to 04:59:59 today (local)
+        prev_start_local = now_local.replace(hour=17, minute=0, second=0, microsecond=0) - timedelta(days=1)
+        prev_end_local = now_local.replace(hour=4, minute=59, second=59, microsecond=0)
+    elif current_hour >= 17:  # Evening (17:00-23:59), previous is Day
+        # Previous day: 05:00 to 16:59:59 today (local)
+        prev_start_local = now_local.replace(hour=5, minute=0, second=0, microsecond=0)
+        prev_end_local = now_local.replace(hour=16, minute=59, second=59, microsecond=0)
+    else:  # Early morning (00:00-04:59), previous is Day yesterday
+        yesterday = now_local - timedelta(days=1)
+        prev_start_local = yesterday.replace(hour=5, minute=0, second=0, microsecond=0)
+        prev_end_local = yesterday.replace(hour=16, minute=59, second=59, microsecond=0)
 
-    return prev_start, prev_end
+    return to_utc_str(prev_start_local), to_utc_str(prev_end_local)
 
 
 def process_time_window_summary(cursor, window_icon, date_str, window_start, window_end):
@@ -638,18 +641,20 @@ def get_glucose_levels_from_window_start(cursor, window_start_dt):
     return glucose_levels
 
 
-def predict_next_window(lookback_days=30):
+def predict_next_window(lookback_days=30, tz_name='UTC'):
     """
     Predict next glucose level and insulin dose using statistical baseline.
 
     Args:
         lookback_days: Number of days of historical data to use (default: 30)
+        tz_name: IANA timezone name of the client (for next window label)
 
     Returns:
         dict: Prediction results with glucose, insulin, confidence, and warnings
     """
-    # Calculate lookback start time
-    now = datetime.now()
+    # Calculate lookback start time in UTC
+    now = datetime.now(timezone.utc)
+    now_local = now.astimezone(ZoneInfo(tz_name))
     lookback_start = (now - timedelta(days=lookback_days)).strftime('%Y-%m-%d %H:%M:%S')
 
     with get_db_connection() as conn:
@@ -690,7 +695,7 @@ def predict_next_window(lookback_days=30):
     if len(glucose_data) < 10:
         warnings.append("Insufficient data: Less than 10 glucose readings available")
         return {
-            'next_window': _get_next_window_name(now),
+            'next_window': _get_next_window_name(now_local),
             'prediction': None,
             'basis': {
                 'data_points': len(glucose_data),
@@ -807,7 +812,7 @@ def predict_next_window(lookback_days=30):
         warnings.append("Monitor closely and adjust as needed")
 
     return {
-        'next_window': _get_next_window_name(now),
+        'next_window': _get_next_window_name(now_local),
         'prediction': {
             'glucose': round(predicted_glucose, 1),
             'glucose_range': [round(glucose_range[0], 1), round(glucose_range[1], 1)],
@@ -987,12 +992,15 @@ class DataAccess:
         return [{'id': row[0], 'supplement_name': row[1], 'default_amount': row[2]} for row in rows]
 
     @staticmethod
-    def get_list_with_filter(query, start_date, end_date, default_hours=24):
+    def get_list_with_filter(query, start_date, end_date, tz_name='UTC', default_hours=24):
         if start_date and end_date:
-            rows = execute_query(query, (start_date, end_date + ' 23:59:59'))
+            utc_start, _ = to_utc_range(start_date, tz_name)
+            _, utc_end = to_utc_range(end_date, tz_name)
+            rows = execute_query(query, (utc_start, utc_end))
         else:
-            query = query.replace('BETWEEN ? AND ?', '>= datetime(\'now\', ?)')
-            rows = execute_query(query, (f'-{default_hours} hour',))
+            cutoff = (datetime.now(timezone.utc) - timedelta(hours=default_hours)).strftime('%Y-%m-%d %H:%M:%S')
+            query = query.replace('BETWEEN ? AND ?', '>= ?')
+            rows = execute_query(query, (cutoff,))
         return rows
 
 
@@ -1037,7 +1045,7 @@ class GlucoseHandler(http.server.SimpleHTTPRequestHandler):
 
     def log_message(self, format, *args):
         """Override to add timestamp to request logs"""
-        timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        timestamp = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
         print(f"[{timestamp}] {format % args}")
 
     def do_GET(self):
@@ -1199,6 +1207,7 @@ class GlucoseHandler(http.server.SimpleHTTPRequestHandler):
 
     def handle_get_list(self, table, query_params):
         """Generic handler for listing records with date filter."""
+        tz_name = parse_tz(query_params, required=False)
         start_date = query_params.get('start_date', [None])[0]
         end_date = query_params.get('end_date', [None])[0]
 
@@ -1206,11 +1215,12 @@ class GlucoseHandler(http.server.SimpleHTTPRequestHandler):
                    WHERE timestamp BETWEEN ? AND ?
                    ORDER BY timestamp DESC'''
 
-        rows = DataAccess.get_list_with_filter(query, start_date, end_date)
+        rows = DataAccess.get_list_with_filter(query, start_date, end_date, tz_name)
         records = [{'id': row[0], 'timestamp': row[1], 'level': row[2]} for row in rows]
         self._send_json(records)
 
     def handle_get_intake_list(self, query_params):
+        tz_name = parse_tz(query_params, required=False)
         start_date = query_params.get('start_date', [None])[0]
         end_date = query_params.get('end_date', [None])[0]
 
@@ -1221,13 +1231,14 @@ class GlucoseHandler(http.server.SimpleHTTPRequestHandler):
                   WHERE i.timestamp BETWEEN ? AND ?
                   ORDER BY i.timestamp DESC'''
 
-        rows = DataAccess.get_list_with_filter(query, start_date, end_date)
+        rows = DataAccess.get_list_with_filter(query, start_date, end_date, tz_name)
         records = [{'id': row[0], 'timestamp': row[1], 'nutrition_id': row[2],
                    'nutrition_name': row[3], 'nutrition_amount': row[4],
                    'nutrition_kcal': row[5]} for row in rows]
         self._send_json(records)
 
     def handle_get_supplement_intake_list(self, query_params):
+        tz_name = parse_tz(query_params, required=False)
         start_date = query_params.get('start_date', [None])[0]
         end_date = query_params.get('end_date', [None])[0]
 
@@ -1238,12 +1249,13 @@ class GlucoseHandler(http.server.SimpleHTTPRequestHandler):
                   WHERE si.timestamp BETWEEN ? AND ?
                   ORDER BY si.timestamp DESC'''
 
-        rows = DataAccess.get_list_with_filter(query, start_date, end_date)
+        rows = DataAccess.get_list_with_filter(query, start_date, end_date, tz_name)
         records = [{'id': row[0], 'timestamp': row[1], 'supplement_id': row[2],
                    'supplement_name': row[3], 'supplement_amount': row[4]} for row in rows]
         self._send_json(records)
 
     def handle_get_event_list(self, query_params):
+        tz_name = parse_tz(query_params, required=False)
         start_date = query_params.get('start_date', [None])[0]
         end_date = query_params.get('end_date', [None])[0]
 
@@ -1252,19 +1264,18 @@ class GlucoseHandler(http.server.SimpleHTTPRequestHandler):
                   WHERE timestamp BETWEEN ? AND ?
                   ORDER BY timestamp DESC'''
 
-        rows = DataAccess.get_list_with_filter(query, start_date, end_date)
+        rows = DataAccess.get_list_with_filter(query, start_date, end_date, tz_name)
         records = [{'id': row[0], 'timestamp': row[1], 'event_name': row[2],
                    'event_notes': row[3]} for row in rows]
         self._send_json(records)
 
     def handle_get_previous_window_intake(self, query_params):
-        client_now = None
-        if 'now' in query_params:
-            try:
-                client_now = datetime.fromisoformat(query_params['now'][0])
-            except ValueError:
-                pass
-        prev_start, prev_end = get_previous_time_window(client_now)
+        try:
+            tz_name = parse_tz(query_params, required=True)
+        except ValueError as e:
+            self._send_error_json(str(e), 400)
+            return
+        prev_start, prev_end = get_previous_time_window(tz_name)
 
         with get_db_connection() as conn:
             cursor = conn.cursor()
@@ -1298,9 +1309,13 @@ class GlucoseHandler(http.server.SimpleHTTPRequestHandler):
         })
 
     def handle_get_glucose_chart(self, query_params):
-        today = date.today()
+        tz_name = parse_tz(query_params, required=False)
+        today = today_in_tz(tz_name)
         start_date = query_params.get('start_date', [f'{today.year}-01-01'])[0]
         end_date = query_params.get('end_date', [f'{today.year}-12-31'])[0]
+
+        utc_start, _ = to_utc_range(start_date, tz_name)
+        _, utc_end = to_utc_range(end_date, tz_name)
 
         glucose_query = '''SELECT timestamp, level FROM glucose
                           WHERE timestamp BETWEEN ? AND ?
@@ -1310,17 +1325,23 @@ class GlucoseHandler(http.server.SimpleHTTPRequestHandler):
                           WHERE timestamp BETWEEN ? AND ?
                           ORDER BY timestamp'''
 
-        glucose_rows = execute_query(glucose_query, (start_date, end_date + ' 23:59:59'))
-        insulin_rows = execute_query(insulin_query, (start_date, end_date + ' 23:59:59'))
+        glucose_rows = execute_query(glucose_query, (utc_start, utc_end))
+        insulin_rows = execute_query(insulin_query, (utc_start, utc_end))
 
         weekly_data = calculate_weekly_mean_both(glucose_rows, insulin_rows)
         self._send_json(weekly_data)
 
     def handle_get_summary(self, query_params):
-        today = date.today()
+        try:
+            tz_name = parse_tz(query_params, required=True)
+        except ValueError as e:
+            self._send_error_json(str(e), 400)
+            return
+
+        today = today_in_tz(tz_name)
         start_date = query_params.get('start_date', [f'{today.year}-{today.month:02d}-01'])[0]
 
-        # Calculate last day of current month
+        # Calculate last day of current month in client timezone
         if today.month == 12:
             default_end = f'{today.year}-12-31'
         else:
@@ -1332,7 +1353,6 @@ class GlucoseHandler(http.server.SimpleHTTPRequestHandler):
         with get_db_connection() as conn:
             cursor = conn.cursor()
 
-            # Get all dates in range
             start_dt = datetime.strptime(start_date, '%Y-%m-%d')
             end_dt = datetime.strptime(end_date, '%Y-%m-%d')
 
@@ -1341,21 +1361,23 @@ class GlucoseHandler(http.server.SimpleHTTPRequestHandler):
 
             while current_dt <= end_dt:
                 date_str = current_dt.strftime('%Y-%m-%d')
+                current_date = current_dt.date()
 
-                # Process Day window (05:00-16:59)
-                day_window_start = f'{date_str} 05:00:00'
-                day_window_end = f'{date_str} 16:59:59'
+                # Day window: 05:00-16:59 local → UTC
+                day_start_utc = local_5am_utc(current_date, tz_name)
+                day_end_utc = day_start_utc + timedelta(hours=12)
                 day_data = process_time_window_summary(cursor, '☀️', date_str,
-                                                     day_window_start, day_window_end)
+                                                      day_start_utc.strftime('%Y-%m-%d %H:%M:%S'),
+                                                      day_end_utc.strftime('%Y-%m-%d %H:%M:%S'))
                 if day_data:
                     summary_data.append(day_data)
 
-                # Process Night window (17:00 to 04:59 next day)
-                night_window_start = f'{date_str} 17:00:00'
-                next_day = (current_dt + timedelta(days=1)).strftime('%Y-%m-%d')
-                night_window_end = f'{next_day} 04:59:59'
+                # Night window: 17:00 local to 05:00 next day local → UTC
+                next_date = (current_dt + timedelta(days=1)).date()
+                night_end_utc = local_5am_utc(next_date, tz_name)
                 night_data = process_time_window_summary(cursor, '🌙', date_str,
-                                                     night_window_start, night_window_end)
+                                                        day_end_utc.strftime('%Y-%m-%d %H:%M:%S'),
+                                                        night_end_utc.strftime('%Y-%m-%d %H:%M:%S'))
                 if night_data:
                     summary_data.append(night_data)
 
@@ -1364,93 +1386,87 @@ class GlucoseHandler(http.server.SimpleHTTPRequestHandler):
         self._send_json(summary_data)
 
     def handle_get_cv_charts(self, query_params):
-        today = date.today()
+        try:
+            tz_name = parse_tz(query_params, required=True)
+        except ValueError as e:
+            self._send_error_json(str(e), 400)
+            return
+
+        today = today_in_tz(tz_name)
         end_date_str = query_params.get('end_date', [today.strftime('%Y-%m-%d')])[0]
         end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
 
-        # Calculate date ranges
-        start_7_days = (end_date - timedelta(days=7)).strftime('%Y-%m-%d')
         start_30_days = (end_date - timedelta(days=30)).strftime('%Y-%m-%d')
-        end_date_with_time = end_date_str + ' 23:59:59'
+        utc_start, _ = to_utc_range(start_30_days, tz_name)
+        _, utc_end = to_utc_range(end_date_str, tz_name)
 
-        # Query glucose data for 30 days (covers all chart needs)
         glucose_query = '''SELECT timestamp, level FROM glucose
                           WHERE timestamp BETWEEN ? AND ?
                           ORDER BY timestamp'''
-        glucose_rows = execute_query(glucose_query, (start_30_days, end_date_with_time))
+        glucose_rows = execute_query(glucose_query, (utc_start, utc_end))
 
-        # Generate windows for each chart
-        windows_7d_12h = generate_cv_windows(end_date, 7, 12)
-        windows_30d_48h = generate_cv_windows(end_date, 30, 48)
-        windows_30d_5d = generate_cv_windows(end_date, 30, 120)
-
-        # Calculate CV data for each chart
-        cv_7d_12h = calculate_cv_data(glucose_rows, windows_7d_12h)
-        cv_30d_48h = calculate_cv_data(glucose_rows, windows_30d_48h)
-        cv_30d_5d = calculate_cv_data(glucose_rows, windows_30d_5d)
+        windows_7d_12h = generate_cv_windows(end_date, 7, 12, tz_name)
+        windows_30d_48h = generate_cv_windows(end_date, 30, 48, tz_name)
+        windows_30d_5d = generate_cv_windows(end_date, 30, 120, tz_name)
 
         self._send_json({
-            'cv_7d_12h': cv_7d_12h,
-            'cv_30d_48h': cv_30d_48h,
-            'cv_30d_5d': cv_30d_5d
+            'cv_7d_12h': calculate_cv_data(glucose_rows, windows_7d_12h),
+            'cv_30d_48h': calculate_cv_data(glucose_rows, windows_30d_48h),
+            'cv_30d_5d': calculate_cv_data(glucose_rows, windows_30d_5d)
         })
 
     def handle_get_risk_metrics(self, query_params):
-        today = date.today()
+        try:
+            tz_name = parse_tz(query_params, required=True)
+        except ValueError as e:
+            self._send_error_json(str(e), 400)
+            return
+
+        today = today_in_tz(tz_name)
         end_date_str = query_params.get('end_date', [today.strftime('%Y-%m-%d')])[0]
         end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
 
-        # Calculate date ranges
-        start_7_days = (end_date - timedelta(days=7)).strftime('%Y-%m-%d')
         start_30_days = (end_date - timedelta(days=30)).strftime('%Y-%m-%d')
-        end_date_with_time = end_date_str + ' 23:59:59'
+        utc_start, _ = to_utc_range(start_30_days, tz_name)
+        _, utc_end = to_utc_range(end_date_str, tz_name)
 
-        # Query glucose data for 30 days (covers all chart needs)
         glucose_query = '''SELECT timestamp, level FROM glucose
                           WHERE timestamp BETWEEN ? AND ?
                           ORDER BY timestamp'''
-        glucose_rows = execute_query(glucose_query, (start_30_days, end_date_with_time))
+        glucose_rows = execute_query(glucose_query, (utc_start, utc_end))
 
-        # Generate windows for each chart
-        windows_7d_12h = generate_cv_windows(end_date, 7, 12)
-        windows_30d_48h = generate_cv_windows(end_date, 30, 48)
-        windows_30d_5d = generate_cv_windows(end_date, 30, 120)
-
-        # Calculate risk metrics for each chart
-        lbgi_7d_12h = calculate_risk_metric_data(glucose_rows, windows_7d_12h, 'lbgi')
-        lbgi_30d_48h = calculate_risk_metric_data(glucose_rows, windows_30d_48h, 'lbgi')
-        lbgi_30d_5d = calculate_risk_metric_data(glucose_rows, windows_30d_5d, 'lbgi')
-
-        hbgi_7d_12h = calculate_risk_metric_data(glucose_rows, windows_7d_12h, 'hbgi')
-        hbgi_30d_48h = calculate_risk_metric_data(glucose_rows, windows_30d_48h, 'hbgi')
-        hbgi_30d_5d = calculate_risk_metric_data(glucose_rows, windows_30d_5d, 'hbgi')
-
-        adrr_7d_12h = calculate_adrr_data(glucose_rows, windows_7d_12h)
-        adrr_30d_48h = calculate_adrr_data(glucose_rows, windows_30d_48h)
-        adrr_30d_5d = calculate_adrr_data(glucose_rows, windows_30d_5d)
+        windows_7d_12h = generate_cv_windows(end_date, 7, 12, tz_name)
+        windows_30d_48h = generate_cv_windows(end_date, 30, 48, tz_name)
+        windows_30d_5d = generate_cv_windows(end_date, 30, 120, tz_name)
 
         self._send_json({
-            'lbgi_7d_12h': lbgi_7d_12h,
-            'lbgi_30d_48h': lbgi_30d_48h,
-            'lbgi_30d_5d': lbgi_30d_5d,
-            'hbgi_7d_12h': hbgi_7d_12h,
-            'hbgi_30d_48h': hbgi_30d_48h,
-            'hbgi_30d_5d': hbgi_30d_5d,
-            'adrr_7d_12h': adrr_7d_12h,
-            'adrr_30d_48h': adrr_30d_48h,
-            'adrr_30d_5d': adrr_30d_5d
+            'lbgi_7d_12h': calculate_risk_metric_data(glucose_rows, windows_7d_12h, 'lbgi'),
+            'lbgi_30d_48h': calculate_risk_metric_data(glucose_rows, windows_30d_48h, 'lbgi'),
+            'lbgi_30d_5d': calculate_risk_metric_data(glucose_rows, windows_30d_5d, 'lbgi'),
+            'hbgi_7d_12h': calculate_risk_metric_data(glucose_rows, windows_7d_12h, 'hbgi'),
+            'hbgi_30d_48h': calculate_risk_metric_data(glucose_rows, windows_30d_48h, 'hbgi'),
+            'hbgi_30d_5d': calculate_risk_metric_data(glucose_rows, windows_30d_5d, 'hbgi'),
+            'adrr_7d_12h': calculate_adrr_data(glucose_rows, windows_7d_12h),
+            'adrr_30d_48h': calculate_adrr_data(glucose_rows, windows_30d_48h),
+            'adrr_30d_5d': calculate_adrr_data(glucose_rows, windows_30d_5d)
         })
 
     def handle_get_prediction(self, query_params):
         """Handle GET /api/dashboard/prediction - Get glucose and insulin prediction."""
+        try:
+            tz_name = parse_tz(query_params, required=True)
+        except ValueError as e:
+            self._send_error_json(str(e), 400)
+            return
+
         lookback_days = int(query_params.get('lookback_days', [30])[0])
 
         try:
-            result = predict_next_window(lookback_days)
+            result = predict_next_window(lookback_days, tz_name)
             self._send_json(result)
         except Exception as e:
             import traceback
-            traceback.print_exc()  # Print to console
+            traceback.print_exc()
             self._send_json({
                 'error': 'prediction_failed',
                 'message': str(e),
