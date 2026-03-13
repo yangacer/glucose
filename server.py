@@ -34,6 +34,7 @@ SERVER_KEY_PATH = os.environ.get('SERVER_KEY', os.path.join(CERTS_DIR, 'server',
 def get_db_connection():
     """Context manager for database connections with automatic cleanup."""
     conn = sqlite3.connect(DB_PATH)
+    conn.execute('PRAGMA journal_mode=WAL')
     try:
         yield conn
     finally:
