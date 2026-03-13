@@ -521,9 +521,10 @@ All functions that define 12-hour or multi-day windows accept `tz_name`:
 | Function | Purpose |
 |---|---|
 | `getClientTz()` | Returns browser IANA timezone via `Intl.DateTimeFormat().resolvedOptions().timeZone` |
+| `utcDbToDate(ts)` | Parses a UTC DB timestamp string (`YYYY-MM-DD HH:MM:SS`) into a `Date` object — single source of the space→T + Z convention |
 | `toDbTimestamp(datetimeLocal)` | Converts `datetime-local` input value → UTC string via `new Date().toISOString()` |
-| `toInputTimestamp(utcStr)` | Converts UTC DB string → `datetime-local` format in browser local time |
-| `formatTimestamp(utcStr)` | Converts UTC DB string → localised display string via `toLocaleString()` |
+| `toInputTimestamp(utcStr)` | Converts UTC DB string → `datetime-local` format in browser local time (uses `utcDbToDate`) |
+| `formatTimestamp(utcStr)` | Converts UTC DB string → localised display string via `toLocaleString()` (uses `utcDbToDate`) |
 
 All API calls in `audit.js`, `dashboard.js`, and `data-loader.js` append
 `&tz=${encodeURIComponent(getClientTz())}`.

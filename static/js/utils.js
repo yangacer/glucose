@@ -155,13 +155,22 @@ function resetButton(button) {
 }
 
 /**
+ * Parse a UTC database timestamp string into a Date object.
+ * All timestamps stored in the DB are UTC (no 'Z' suffix by convention).
+ * @param {string} ts - UTC timestamp (YYYY-MM-DD HH:MM:SS)
+ * @returns {Date}
+ */
+function utcDbToDate(ts) {
+    return new Date(ts.replace(' ', 'T') + 'Z');
+}
+
+/**
  * Convert database timestamp to datetime-local format
  * @param {string} dbTimestamp - Database timestamp (YYYY-MM-DD HH:MM:SS)
  * @returns {string} Datetime local format (YYYY-MM-DDTHH:MM)
  */
 function toInputTimestamp(dbTimestamp) {
-    // dbTimestamp is UTC; convert to browser local time for datetime-local inputs
-    const d = new Date(dbTimestamp.replace(' ', 'T') + 'Z');
+    const d = utcDbToDate(dbTimestamp);
     const year = d.getFullYear();
     const month = String(d.getMonth() + 1).padStart(2, '0');
     const day = String(d.getDate()).padStart(2, '0');
@@ -176,7 +185,7 @@ function toInputTimestamp(dbTimestamp) {
  * @returns {string} Localised display string
  */
 function formatTimestamp(utcStr) {
-    return new Date(utcStr.replace(' ', 'T') + 'Z').toLocaleString();
+    return utcDbToDate(utcStr).toLocaleString();
 }
 
 /**

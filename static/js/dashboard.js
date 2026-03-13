@@ -200,11 +200,10 @@ async function loadSummary() {
  * Show overlay with detailed information
  */
 function showSummaryOverlay(row) {
-    // Extract time from timestamp (HH:MM format)
+    // Parse as UTC then display in browser local time
     const formatTime = (timestamp) => {
         if (!timestamp || timestamp === '-') return '-';
-        const date = new Date(timestamp);
-        return date.toTimeString().slice(0, 5); // HH:MM
+        return utcDbToDate(timestamp).toTimeString().slice(0, 5); // HH:MM local time
     };
     
     document.getElementById('overlay-dose-time').textContent = formatTime(row.dose_time);
