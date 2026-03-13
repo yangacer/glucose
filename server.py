@@ -16,6 +16,8 @@ from collections import defaultdict
 PORT = int(os.environ.get('PORT', '8443'))  # Default HTTPS port for mTLS
 DB_PATH = os.environ.get('DB_PATH', 'glucose.db')
 
+DEBUG_STATIC = os.environ.get('DEBUG_STATIC', 'false').lower() == 'true'
+
 # mTLS Configuration
 MTLS_ENABLED = os.environ.get('MTLS_ENABLED', 'true').lower() == 'true'
 CERTS_DIR = os.path.join(os.path.dirname(__file__), 'certs')
@@ -1022,8 +1024,8 @@ class GlucoseHandler(http.server.SimpleHTTPRequestHandler):
         return super().guess_type(path)
 
     def list_directory(self, path):
-        """Redirect root directory to index.html (or index.html.dev in dev mode)."""
-        index_file = 'index.html.dev' if not MTLS_ENABLED else 'index.html'
+        """Redirect root directory to index.html (or index.html.dev when DEBUG_STATIC)."""
+        index_file = 'index.html.dev' if DEBUG_STATIC else 'index.html'
         self.send_response(301)
         self.send_header('Location', f'/static/{index_file}')
         self.end_headers()
@@ -1059,8 +1061,8 @@ class GlucoseHandler(http.server.SimpleHTTPRequestHandler):
             path = parsed_path.path
             query_params = urllib.parse.parse_qs(parsed_path.query)
 
-            # In dev mode (MTLS_ENABLED=false), redirect index.html to index.html.dev
-            if not MTLS_ENABLED and path == '/static/index.html':
+            # When DEBUG_STATIC, redirect index.html to index.html.dev
+            if DEBUG_STATIC and path == '/static/index.html':
                 self.send_response(301)
                 self.send_header('Location', '/static/index.html.dev')
                 self.end_headers()
@@ -1582,12 +1584,14 @@ def main():
             print(f"  Clients must present valid certificates signed by the CA")
             print(f"  Multi-threaded mode: Handles concurrent requests")
             print(f"  See CLIENT.md for client configuration instructions")
+            print(f"  Static: {'index.html.dev (DEBUG_STATIC)' if DEBUG_STATIC else 'index.html'}")
             httpd.serve_forever()
     else:
         # Run without mTLS (development mode, multi-threaded)
         print("WARNING: mTLS is DISABLED - running in insecure mode!")
         print(f"Server running at http://localhost:{PORT}/")
         print(f"Multi-threaded mode: Handles concurrent requests")
+        print(f"Static: {'index.html.dev (DEBUG_STATIC)' if DEBUG_STATIC else 'index.html'}")
 
         with socketserver.ThreadingTCPServer(("", PORT), GlucoseHandler) as httpd:
             httpd.serve_forever()
