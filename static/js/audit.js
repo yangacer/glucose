@@ -441,37 +441,21 @@ async function deleteNutritionItem(id) {
 }
 
 /**
- * Edit supplement row (inline editing)
+ * Edit supplement via prompt dialogs
  */
-function editSupplementRow(id) {
-    const row = document.querySelector(`button[data-id="${id}"]`).closest('tr');
-    row.querySelectorAll('.view-mode').forEach(el => el.style.display = 'none');
-    row.querySelectorAll('.edit-mode').forEach(el => el.style.display = 'inline');
-    row.querySelector('.edit-btn').style.display = 'none';
-    row.querySelector('.save-btn').style.display = 'inline';
-    row.querySelector('.cancel-btn').style.display = 'inline';
-    row.querySelector('.delete-btn').style.display = 'none';
-}
+async function editSupplement(id, name, defaultAmount) {
+    const newName = prompt('Enter supplement name:', name);
+    if (newName === null) return;
+    const newAmount = prompt('Enter default amount:', defaultAmount);
+    if (newAmount === null) return;
 
-/**
- * Save supplement row
- */
-async function saveSupplementRow(id) {
-    const row = document.querySelector(`button[data-id="${id}"]`).closest('tr');
-    const data = {};
-    
-    row.querySelectorAll('.edit-mode').forEach(input => {
-        const field = input.dataset.field;
-        data[field] = input.type === 'number' ? parseFloat(input.value) : input.value;
-    });
-    
     try {
         const response = await fetch(`${API_BASE}/supplements/${id}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data)
+            body: JSON.stringify({ supplement_name: newName, default_amount: parseFloat(newAmount) })
         });
-        
+
         if (response.ok) {
             loadSupplementsList();
         } else {

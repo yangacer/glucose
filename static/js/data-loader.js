@@ -117,14 +117,10 @@ async function loadSupplementsList() {
             html += `
                 <tr>
                     <td>${item.id}</td>
-                    <td><span class="view-mode">${item.supplement_name}</span>
-                        <input type="text" class="edit-mode" style="display:none;" value="${item.supplement_name}" data-field="supplement_name"></td>
-                    <td><span class="view-mode">${item.default_amount}</span>
-                        <input type="number" class="edit-mode" style="display:none;" value="${item.default_amount}" step="0.1" data-field="default_amount"></td>
+                    <td>${escapeHtml(item.supplement_name)}</td>
+                    <td>${item.default_amount}</td>
                     <td>
-                        <button class="edit-btn" data-id="${item.id}">Edit</button>
-                        <button class="save-btn" data-id="${item.id}" style="display:none;">Save</button>
-                        <button class="cancel-btn" data-id="${item.id}" style="display:none;">Cancel</button>
+                        <button class="edit-btn" data-id="${item.id}" data-name="${escapeHtml(item.supplement_name)}" data-amount="${item.default_amount}">Edit</button>
                         <button class="delete-btn" data-id="${item.id}">Delete</button>
                     </td>
                 </tr>
@@ -134,32 +130,15 @@ async function loadSupplementsList() {
         html += '</tbody></table></div>';
         container.innerHTML = html;
         
-        // Add event listeners
-        attachSupplementsListListeners(container);
+        container.querySelectorAll('.edit-btn').forEach(btn => {
+            btn.addEventListener('click', () => editSupplement(btn.dataset.id, btn.dataset.name, btn.dataset.amount));
+        });
+        container.querySelectorAll('.delete-btn').forEach(btn => {
+            btn.addEventListener('click', () => deleteSupplement(btn.dataset.id));
+        });
     } catch (err) {
         console.error('Failed to load supplements list:', err);
     }
-}
-
-/**
- * Attach event listeners to supplements list buttons
- */
-function attachSupplementsListListeners(container) {
-    container.querySelectorAll('.edit-btn').forEach(btn => {
-        btn.addEventListener('click', () => editSupplementRow(btn.dataset.id));
-    });
-    
-    container.querySelectorAll('.save-btn').forEach(btn => {
-        btn.addEventListener('click', () => saveSupplementRow(btn.dataset.id));
-    });
-    
-    container.querySelectorAll('.cancel-btn').forEach(btn => {
-        btn.addEventListener('click', () => loadSupplementsList());
-    });
-    
-    container.querySelectorAll('.delete-btn').forEach(btn => {
-        btn.addEventListener('click', () => deleteSupplement(btn.dataset.id));
-    });
 }
 
 /**
