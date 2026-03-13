@@ -174,6 +174,14 @@ async function handleIntakeSubmit(e) {
     const nutritionAmounts = formData.getAll('nutrition_amount[]');
     const supplementIds = formData.getAll('supplement_id[]');
     const supplementAmounts = formData.getAll('supplement_amount[]');
+
+    const filledNutrition = nutritionIds.filter(id => id).length;
+    const filledSupplements = supplementIds.filter(id => id).length;
+    if (filledNutrition + filledSupplements === 0) {
+        resetButton(submitBtn);
+        showMessage('intake-message', false, 'Please add at least one nutrition or supplement item');
+        return;
+    }
     
     let allSuccess = true;
     let messages = [];
@@ -214,7 +222,7 @@ async function handleIntakeSubmit(e) {
     
     resetButton(submitBtn);
     if (allSuccess) {
-        const totalItems = nutritionIds.filter(id => id).length + supplementIds.filter(id => id).length;
+        const totalItems = filledNutrition + filledSupplements;
         showMessage('intake-message', true, `Successfully submitted ${totalItems} item(s)!`);
         resetIntakeForm();
         loadIntakeAudit();

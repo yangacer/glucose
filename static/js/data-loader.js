@@ -233,10 +233,14 @@ function addEmptyNutritionItem(container) {
             </select>
         </label>
         <label>Amount (gram): <input type="number" name="nutrition_amount[]" required min="0" step="0.1"></label>
-        <button type="button" class="remove-nutrition-btn" style="display:none;">Remove</button>
+        <button type="button" class="remove-nutrition-btn">Remove</button>
     `;
     container.appendChild(newItem);
     loadNutritionOptionsForSelect(newItem.querySelector('.nutrition-select'));
+    newItem.querySelector('.remove-nutrition-btn').addEventListener('click', function() {
+        newItem.remove();
+        renumberNutritionItems();
+    });
 }
 
 /**
@@ -283,10 +287,15 @@ function addEmptySupplementItem(container) {
             </select>
         </label>
         <label>Amount: <input type="number" name="supplement_amount[]" required min="0" step="0.1"></label>
-        <button type="button" class="remove-supplement-btn" style="display:none;">Remove</button>
+        <button type="button" class="remove-supplement-btn">Remove</button>
     `;
     container.appendChild(newItem);
     loadSupplementOptionsForSelect(newItem.querySelector('.supplement-select'));
+    newItem.querySelector('.remove-supplement-btn').addEventListener('click', function() {
+        newItem.remove();
+        updateSupplementRemoveButtons();
+        renumberSupplementItems();
+    });
 }
 
 /**

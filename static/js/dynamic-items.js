@@ -12,7 +12,17 @@ function initializeDynamicItems() {
     
     // Add supplement item button
     document.getElementById('add-supplement-btn').addEventListener('click', addSupplementItem);
-    
+
+    // Initialize remove button for initial nutrition item
+    const initialNutritionRemoveBtn = document.querySelector('#nutrition-items-container .remove-nutrition-btn');
+    if (initialNutritionRemoveBtn) {
+        initialNutritionRemoveBtn.addEventListener('click', function() {
+            const item = this.closest('.nutrition-item');
+            item.remove();
+            renumberNutritionItems();
+        });
+    }
+
     // Initialize remove button for initial supplement item
     const initialSupplementRemoveBtn = document.querySelector('#supplement-items-container .remove-supplement-btn');
     if (initialSupplementRemoveBtn) {
@@ -92,7 +102,7 @@ function updateNutritionRemoveButtons() {
     const items = document.querySelectorAll('#nutrition-items-container .nutrition-item');
     items.forEach(item => {
         const removeBtn = item.querySelector('.remove-nutrition-btn');
-        removeBtn.style.display = items.length > 1 ? 'inline-block' : 'none';
+        removeBtn.style.display = 'inline-block';
     });
 }
 

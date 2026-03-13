@@ -379,33 +379,31 @@ See `DEPLOY.md` for detailed workflow documentation.
 ### Key Features:
 
 **Nutrition Items:**
-- Always require at least one item
-- Remove button hidden on last item
+- All items can be removed (nutrition is now optional, like supplements)
+- Remove button always visible
+- Supports zero nutrition submissions (form requires at least one nutrition OR supplement)
 - Automatic renumbering after removal
 - Event listeners attached dynamically
 
 **Supplement Items:**
-- Can remove ALL items (optional supplements) - **v0.7.0**
+- Can remove ALL items (optional supplements)
 - Remove button always visible
 - Supports zero supplement submissions
-- Initial item event listener in `initializeDynamicItems()`
+- Event listeners attached dynamically
+
+**Event Listener Lifecycle:**
+`addEmptyNutritionItem()` and `addEmptySupplementItem()` self-attach remove listeners.
+This is required because `populatePreviousNutritionItems()` / `populatePreviousSupplementItems()`
+clear `container.innerHTML = ''` on autofill, destroying any previously attached listeners.
+`initializeDynamicItems()` only wires the static HTML items present at page load.
 
 **Functions:**
-- `addNutritionItem()` - Adds new nutrition row
-- `addSupplementItem()` - Adds new supplement row
-- `updateNutritionRemoveButtons()` - Shows/hides remove buttons
+- `addNutritionItem()` - Adds new nutrition row with self-attached remove listener
+- `addSupplementItem()` - Adds new supplement row with self-attached remove listener
+- `updateNutritionRemoveButtons()` - Always shows remove buttons
 - `updateSupplementRemoveButtons()` - Always shows remove buttons
 - `renumberNutritionItems()` - Updates item numbers after removal
 - `renumberSupplementItems()` - Updates supplement numbers after removal
-
-**Change in v0.7.0:**
-```javascript
-// OLD: Only show when multiple items
-removeBtn.style.display = items.length > 1 ? 'inline-block' : 'none';
-
-// NEW: Always show (allow removing all)
-removeBtn.style.display = 'inline-block';
-```
 
 ## Form Submission Flow
 
@@ -437,6 +435,10 @@ async (e) => {
 **Applied to Forms:**
 - Glucose, Insulin, Event, Nutrition, Supplements (simple forms)
 - Intake form (complex multi-item with special handling)
+
+**Intake Form Validation:**
+- Requires at least one filled nutrition OR supplement item before submitting
+- Zero-item submission blocked with error message
 
 **Error Handling:**
 - Network errors caught and displayed

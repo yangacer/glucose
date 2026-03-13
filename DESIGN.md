@@ -122,7 +122,8 @@ Tabbed interface with the following sections:
 
 **Features:**
 - Dynamic add/remove for nutrition and supplement items
-- All supplement items can be removed (optional supplements)
+- All nutrition and supplement items can be removed individually
+- At least one item (nutrition or supplement) required for submission
 - Auto-fill from previous time window (12-hour periods)
 - Separate audit lists for nutrition and supplements
 - Edit and delete existing records
