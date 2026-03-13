@@ -73,7 +73,8 @@ def get_db_connection():
 **Approach:** Full timestamp indexes (not date-part)
 
 **Rationale:**
-- All queries use `BETWEEN` with full datetime strings
+- Most queries use `BETWEEN` with full datetime strings
+- `process_time_window_summary` uses half-open intervals (`>= start AND < end`) to avoid double-counting records at shared window boundaries
 - SQLite B-tree efficiently handles ISO8601 string prefix matching
 - No overhead from function calls like `DATE(timestamp)`
 - Supports both range and point queries
@@ -229,14 +230,15 @@ route_handlers = {
 
 ## Development vs Production
 
-**Development Mode (`MTLS_ENABLED=false`):**
+**Development Mode (`DEBUG_STATIC=true`):**
 - Server serves `static/index.html.dev`
 - Individual JS files loaded separately (unminified)
 - Easy debugging with readable code and line numbers
 - No build step required during development
 - Fast iteration: edit JS → refresh browser
+- Independent of `MTLS_ENABLED` (mTLS can remain enabled during development)
 
-**Production Mode (`MTLS_ENABLED=true`):**
+**Production Mode (default / `DEBUG_STATIC=false`):**
 - Server serves `static/index.html`
 - Single minified bundle `js/release/app.min.js?v=x.y.z`
 - Optimized for performance and caching
@@ -553,6 +555,7 @@ to run the same migration twice.
 
 **Environment Variables:**
 - `MTLS_ENABLED` - Toggle mTLS (default: true)
+- `DEBUG_STATIC` - Serve `index.html.dev` instead of `index.html` (default: false); independent of `MTLS_ENABLED`
 - `CA_CERT`, `SERVER_CERT`, `SERVER_KEY` - Certificate paths
 
 **Functions:**
@@ -630,14 +633,14 @@ to run the same migration twice.
 # Run all tests
 python3 test_server.py
 
-# Test in development mode (unminified JS)
-MTLS_ENABLED=false PORT=8000 python3 server.py
+# Test in development mode (unminified JS, mTLS still active)
+DEBUG_STATIC=true PORT=8000 python3 server.py
 
 # Test in production mode (minified JS)
 # First build the bundle:
 ./build-js.py
 # Then start server:
-MTLS_ENABLED=true PORT=8443 python3 server.py
+PORT=8443 python3 server.py
 ```
 
 ## Common Patterns
@@ -868,12 +871,12 @@ sqlite3 glucose.db "PRAGMA busy_timeout;"
 
 **During development:**
 1. Edit JS files in `static/js/`
-2. Test with `MTLS_ENABLED=false` (uses `index.html.dev`)
+2. Test with `DEBUG_STATIC=true` (serves `index.html.dev`)
 3. No build step needed
 
 **Before production deployment:**
 1. Update version: `./build-js.py <new_version>`
-2. Test with `MTLS_ENABLED=true` to verify minified bundle
+2. Test without `DEBUG_STATIC` to verify minified bundle
 3. Commit both `index.html.dev` and generated `index.html`
 
 **Changing script dependency order:**

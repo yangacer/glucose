@@ -558,11 +558,11 @@ def get_previous_time_window(tz_name: str) -> tuple:
 
 def process_time_window_summary(cursor, window_icon, date_str, window_start, window_end):
     """Process and aggregate data for a 12-hour time window."""
-    # Get all intakes in this window
+    # Get all intakes in this window (half-open: [window_start, window_end))
     cursor.execute('''SELECT i.timestamp, i.nutrition_kcal, n.nutrition_name
                      FROM intake i
                      JOIN nutrition n ON i.nutrition_id = n.id
-                     WHERE i.timestamp BETWEEN ? AND ?
+                     WHERE i.timestamp >= ? AND i.timestamp < ?
                      ORDER BY i.timestamp''',
                   (window_start, window_end))
     intakes = cursor.fetchall()
@@ -582,9 +582,9 @@ def process_time_window_summary(cursor, window_icon, date_str, window_start, win
         total_kcal = 0
         nutrition_str = ''
 
-    # Get insulin dose in this window
+    # Get insulin dose in this window (half-open: [window_start, window_end))
     cursor.execute('''SELECT timestamp, level FROM insulin
-                     WHERE timestamp BETWEEN ? AND ?
+                     WHERE timestamp >= ? AND timestamp < ?
                      ORDER BY timestamp DESC LIMIT 1''',
                   (window_start, window_end))
     insulin_row = cursor.fetchone()
@@ -594,19 +594,19 @@ def process_time_window_summary(cursor, window_icon, date_str, window_start, win
     # Get glucose levels based on window start time
     glucose_levels = get_glucose_levels_from_window_start(cursor, window_start_dt)
 
-    # Get events in window
+    # Get events in window (half-open: [window_start, window_end))
     cursor.execute('''SELECT event_name FROM event
-                     WHERE timestamp BETWEEN ? AND ?
+                     WHERE timestamp >= ? AND timestamp < ?
                      ORDER BY timestamp''',
                   (window_start, window_end))
     events = cursor.fetchall()
     grouped_events = ', '.join([e[0] for e in events]) if events else ''
 
-    # Get supplements in window
+    # Get supplements in window (half-open: [window_start, window_end))
     cursor.execute('''SELECT s.supplement_name, si.supplement_amount
                      FROM supplement_intake si
                      JOIN supplements s ON si.supplement_id = s.id
-                     WHERE si.timestamp BETWEEN ? AND ?
+                     WHERE si.timestamp >= ? AND si.timestamp < ?
                      ORDER BY si.timestamp''',
                   (window_start, window_end))
     supplements = cursor.fetchall()
