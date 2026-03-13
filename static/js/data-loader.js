@@ -237,10 +237,6 @@ function addEmptyNutritionItem(container) {
     `;
     container.appendChild(newItem);
     loadNutritionOptionsForSelect(newItem.querySelector('.nutrition-select'));
-    newItem.querySelector('.remove-nutrition-btn').addEventListener('click', function() {
-        newItem.remove();
-        renumberNutritionItems();
-    });
 }
 
 /**
@@ -264,12 +260,6 @@ async function addPreviousNutritionItem(container, item) {
     
     await loadNutritionOptionsForSelect(newItem.querySelector('.nutrition-select'));
     newItem.querySelector('.nutrition-select').value = item.nutrition_id;
-    
-    newItem.querySelector('.remove-nutrition-btn').addEventListener('click', function() {
-        newItem.remove();
-        updateNutritionRemoveButtons();
-        renumberNutritionItems();
-    });
 }
 
 /**
@@ -291,11 +281,6 @@ function addEmptySupplementItem(container) {
     `;
     container.appendChild(newItem);
     loadSupplementOptionsForSelect(newItem.querySelector('.supplement-select'));
-    newItem.querySelector('.remove-supplement-btn').addEventListener('click', function() {
-        newItem.remove();
-        updateSupplementRemoveButtons();
-        renumberSupplementItems();
-    });
 }
 
 /**
@@ -319,10 +304,4 @@ async function addPreviousSupplementItem(container, item) {
     
     await loadSupplementOptionsForSelect(newItem.querySelector('.supplement-select'));
     newItem.querySelector('.supplement-select').value = item.supplement_id;
-    
-    newItem.querySelector('.remove-supplement-btn').addEventListener('click', function() {
-        newItem.remove();
-        updateSupplementRemoveButtons();
-        renumberSupplementItems();
-    });
 }

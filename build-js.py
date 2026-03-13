@@ -137,7 +137,7 @@ def minify(content, output_file):
     
     try:
         result = subprocess.run(
-            ["terser", str(temp_file), "-o", str(output_file), "--compress", "--mangle"],
+            ["terser", str(temp_file), "-o", str(output_file), "--compress", "--mangle", "--toplevel"],
             check=True,
             capture_output=True,
             text=True

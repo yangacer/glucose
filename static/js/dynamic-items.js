@@ -7,32 +7,23 @@ let supplementItemCount = 1;
  * Initialize add/remove buttons for dynamic items
  */
 function initializeDynamicItems() {
-    // Add nutrition item button
     document.getElementById('add-nutrition-btn').addEventListener('click', addNutritionItem);
-    
-    // Add supplement item button
     document.getElementById('add-supplement-btn').addEventListener('click', addSupplementItem);
 
-    // Initialize remove button for initial nutrition item
-    const initialNutritionRemoveBtn = document.querySelector('#nutrition-items-container .remove-nutrition-btn');
-    if (initialNutritionRemoveBtn) {
-        initialNutritionRemoveBtn.addEventListener('click', function() {
-            const item = this.closest('.nutrition-item');
-            item.remove();
+    document.getElementById('nutrition-items-container').addEventListener('click', e => {
+        if (e.target.matches('.remove-nutrition-btn')) {
+            e.target.closest('.nutrition-item').remove();
             renumberNutritionItems();
-        });
-    }
+        }
+    });
 
-    // Initialize remove button for initial supplement item
-    const initialSupplementRemoveBtn = document.querySelector('#supplement-items-container .remove-supplement-btn');
-    if (initialSupplementRemoveBtn) {
-        initialSupplementRemoveBtn.addEventListener('click', function() {
-            const item = this.closest('.supplement-item');
-            item.remove();
+    document.getElementById('supplement-items-container').addEventListener('click', e => {
+        if (e.target.matches('.remove-supplement-btn')) {
+            e.target.closest('.supplement-item').remove();
             updateSupplementRemoveButtons();
             renumberSupplementItems();
-        });
-    }
+        }
+    });
 }
 
 /**
@@ -57,13 +48,8 @@ function addNutritionItem() {
     
     loadNutritionOptionsForSelect(newItem.querySelector('.nutrition-select'));
     updateNutritionRemoveButtons();
-    
-    newItem.querySelector('.remove-nutrition-btn').addEventListener('click', function() {
-        newItem.remove();
-        updateNutritionRemoveButtons();
-        renumberNutritionItems();
-    });
 }
+
 
 /**
  * Add a new supplement item to the form
@@ -87,13 +73,8 @@ function addSupplementItem() {
     
     loadSupplementOptionsForSelect(newItem.querySelector('.supplement-select'));
     updateSupplementRemoveButtons();
-    
-    newItem.querySelector('.remove-supplement-btn').addEventListener('click', function() {
-        newItem.remove();
-        updateSupplementRemoveButtons();
-        renumberSupplementItems();
-    });
 }
+
 
 /**
  * Update visibility of nutrition remove buttons

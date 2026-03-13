@@ -255,7 +255,7 @@ route_handlers = {
 1. Reads script order from `static/index.html.dev`
 2. Scans `static/js/` for `*.js` files (excludes `*.min.js` and chart files)
 3. Combines files in dependency order
-4. Minifies with terser
+4. Minifies with terser (`--compress --mangle --toplevel`)
 5. Generates `static/index.html` with versioned script tag
 
 **Key Files:**
@@ -383,23 +383,27 @@ See `DEPLOY.md` for detailed workflow documentation.
 - Remove button always visible
 - Supports zero nutrition submissions (form requires at least one nutrition OR supplement)
 - Automatic renumbering after removal
-- Event listeners attached dynamically
 
 **Supplement Items:**
 - Can remove ALL items (optional supplements)
 - Remove button always visible
 - Supports zero supplement submissions
-- Event listeners attached dynamically
 
-**Event Listener Lifecycle:**
-`addEmptyNutritionItem()` and `addEmptySupplementItem()` self-attach remove listeners.
-This is required because `populatePreviousNutritionItems()` / `populatePreviousSupplementItems()`
-clear `container.innerHTML = ''` on autofill, destroying any previously attached listeners.
-`initializeDynamicItems()` only wires the static HTML items present at page load.
+**Event Listener Strategy — Event Delegation:**
+`initializeDynamicItems()` attaches two delegated listeners on the containers:
+```javascript
+document.getElementById('nutrition-items-container').addEventListener('click', e => {
+    if (e.target.matches('.remove-nutrition-btn')) { ... }
+});
+```
+This means remove buttons on *all* items — static HTML, autofill-rebuilt, or dynamically added — work without any per-item listener attachment. `addEmpty*` and `addPrevious*` functions create DOM only; no listener wiring needed.
+
+**Button Event Wiring:**
+All `onclick`-style wiring (dashboard update buttons, filter buttons, reset-to-now buttons) is centralised in `main.js` `initializeApp()` using `addEventListener`. No `onclick=` attributes exist in HTML.
 
 **Functions:**
-- `addNutritionItem()` - Adds new nutrition row with self-attached remove listener
-- `addSupplementItem()` - Adds new supplement row with self-attached remove listener
+- `addNutritionItem()` - Adds new nutrition row (no listener attachment needed)
+- `addSupplementItem()` - Adds new supplement row (no listener attachment needed)
 - `updateNutritionRemoveButtons()` - Always shows remove buttons
 - `updateSupplementRemoveButtons()` - Always shows remove buttons
 - `renumberNutritionItems()` - Updates item numbers after removal
@@ -674,12 +678,17 @@ MTLS_ENABLED=true PORT=8443 python3 server.py
 **Adding dynamic items (like supplements):**
 1. Create container in HTML: `<div id="items-container"></div>`
 2. Add functions in `dynamic-items.js`:
-   - `addItem()` - Create new item with remove button
+   - `addItem()` - Create new item DOM only (no listener attachment)
    - `updateRemoveButtons()` - Show/hide based on rules
    - `renumberItems()` - Update labels after removal
-3. Attach event listeners in `initializeDynamicItems()`
+3. Add delegated listener on the container in `initializeDynamicItems()`:
+   ```javascript
+   document.getElementById('items-container').addEventListener('click', e => {
+       if (e.target.matches('.remove-btn')) { e.target.closest('.item').remove(); ... }
+   });
+   ```
 4. For optional items: always show remove button
-5. For required items: hide when count = 1
+5. Wire static button IDs (not onclick attributes) in `main.js` `initializeApp()`
 
 ---
 
