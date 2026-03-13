@@ -25,11 +25,18 @@ async function loadGlucoseAudit() {
             <td>${formatTimestamp(record.timestamp)}</td>
             <td>${record.level}</td>
             <td>
-                <button class="edit-btn" onclick="editGlucose(${record.id}, '${record.timestamp}', ${record.level})">Edit</button>
-                <button class="delete-btn" onclick="deleteGlucose(${record.id})">Delete</button>
+                <button class="edit-btn" data-id="${record.id}" data-ts="${record.timestamp}" data-level="${record.level}">Edit</button>
+                <button class="delete-btn" data-id="${record.id}">Delete</button>
             </td>
         `;
         tbody.appendChild(tr);
+    });
+
+    tbody.querySelectorAll('.edit-btn').forEach(btn => {
+        btn.addEventListener('click', () => editGlucose(btn.dataset.id, btn.dataset.ts, btn.dataset.level));
+    });
+    tbody.querySelectorAll('.delete-btn').forEach(btn => {
+        btn.addEventListener('click', () => deleteGlucose(btn.dataset.id));
     });
 }
 
@@ -102,11 +109,18 @@ async function loadInsulinAudit() {
             <td>${formatTimestamp(record.timestamp)}</td>
             <td>${record.level}</td>
             <td>
-                <button class="edit-btn" onclick="editInsulin(${record.id}, '${record.timestamp}', ${record.level})">Edit</button>
-                <button class="delete-btn" onclick="deleteInsulin(${record.id})">Delete</button>
+                <button class="edit-btn" data-id="${record.id}" data-ts="${record.timestamp}" data-level="${record.level}">Edit</button>
+                <button class="delete-btn" data-id="${record.id}">Delete</button>
             </td>
         `;
         tbody.appendChild(tr);
+    });
+
+    tbody.querySelectorAll('.edit-btn').forEach(btn => {
+        btn.addEventListener('click', () => editInsulin(btn.dataset.id, btn.dataset.ts, btn.dataset.level));
+    });
+    tbody.querySelectorAll('.delete-btn').forEach(btn => {
+        btn.addEventListener('click', () => deleteInsulin(btn.dataset.id));
     });
 }
 
@@ -181,11 +195,26 @@ async function loadIntakeAudit() {
             <td>${record.nutrition_amount}</td>
             <td>${record.nutrition_kcal.toFixed(1)}</td>
             <td>
-                <button class="edit-btn" onclick="editIntake(${record.id}, '${record.timestamp}', ${record.nutrition_id}, '${escapeHtml(record.nutrition_name)}', ${record.nutrition_amount})">Edit</button>
-                <button class="delete-btn" onclick="deleteIntake(${record.id})">Delete</button>
+                <button class="edit-btn"
+                    data-id="${record.id}"
+                    data-ts="${record.timestamp}"
+                    data-nid="${record.nutrition_id}"
+                    data-name="${escapeHtml(record.nutrition_name)}"
+                    data-amount="${record.nutrition_amount}">Edit</button>
+                <button class="delete-btn" data-id="${record.id}">Delete</button>
             </td>
         `;
         tbody.appendChild(tr);
+    });
+
+    tbody.querySelectorAll('.edit-btn').forEach(btn => {
+        btn.addEventListener('click', () => editIntake(
+            btn.dataset.id, btn.dataset.ts, btn.dataset.nid,
+            btn.dataset.name, btn.dataset.amount
+        ));
+    });
+    tbody.querySelectorAll('.delete-btn').forEach(btn => {
+        btn.addEventListener('click', () => deleteIntake(btn.dataset.id));
     });
 }
 
@@ -244,7 +273,7 @@ async function editIntake(id, timestamp, nutritionId, nutritionName, nutritionAm
         cancelBtn.id = 'cancel-edit-btn';
         cancelBtn.textContent = 'Cancel Edit';
         cancelBtn.className = 'secondary-btn';
-        cancelBtn.onclick = cancelIntakeEdit;
+        cancelBtn.addEventListener('click', cancelIntakeEdit);
         submitBtn.parentNode.insertBefore(cancelBtn, submitBtn.nextSibling);
     }
     
@@ -319,10 +348,14 @@ async function loadSupplementIntakeAudit() {
             <td>${record.supplement_name}</td>
             <td>${record.supplement_amount}</td>
             <td>
-                <button class="delete-btn" onclick="deleteSupplementIntake(${record.id})">Delete</button>
+                <button class="delete-btn" data-id="${record.id}">Delete</button>
             </td>
         `;
         tbody.appendChild(tr);
+    });
+
+    tbody.querySelectorAll('.delete-btn').forEach(btn => {
+        btn.addEventListener('click', () => deleteSupplementIntake(btn.dataset.id));
     });
 }
 
@@ -370,10 +403,14 @@ async function loadEventAudit() {
             <td>${record.event_name}</td>
             <td>${record.event_notes || ''}</td>
             <td>
-                <button class="delete-btn" onclick="deleteEvent(${record.id})">Delete</button>
+                <button class="delete-btn" data-id="${record.id}">Delete</button>
             </td>
         `;
         tbody.appendChild(tr);
+    });
+
+    tbody.querySelectorAll('.delete-btn').forEach(btn => {
+        btn.addEventListener('click', () => deleteEvent(btn.dataset.id));
     });
 }
 
@@ -414,10 +451,14 @@ async function loadNutritionAudit() {
             <td>${record.weight}</td>
             <td>${record.kcal_per_gram.toFixed(4)}</td>
             <td>
-                <button class="delete-btn" onclick="deleteNutritionItem(${record.id})">Delete</button>
+                <button class="delete-btn" data-id="${record.id}">Delete</button>
             </td>
         `;
         tbody.appendChild(tr);
+    });
+
+    tbody.querySelectorAll('.delete-btn').forEach(btn => {
+        btn.addEventListener('click', () => deleteNutritionItem(btn.dataset.id));
     });
 }
 
@@ -490,3 +531,4 @@ async function deleteSupplement(id) {
         alert('Failed to delete supplement');
     }
 }
+
