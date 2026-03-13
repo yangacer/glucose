@@ -262,7 +262,7 @@ CV = (Standard Deviation / Time-Weighted Mean) × 100
 
 **ADRR (Average Daily Risk Range)**
 - Combines LBGI and HBGI for overall risk assessment
-- Groups data by calendar days
+- Per-window value: LBGI + HBGI computed directly on that window's readings
 - Threshold bands (adjusted for cats):
   - Green (0-25): Low risk
   - Yellow (25-50): Moderate risk

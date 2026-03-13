@@ -450,7 +450,8 @@ function renderRiskChart(canvasId, data, chartInstance, metricName, thresholds, 
                 data: data.map(d => d.value),
                 borderColor: '#667eea',
                 backgroundColor: 'rgba(102, 126, 234, 0.1)',
-                tension: 0.1
+                tension: 0.1,
+                spanGaps: true
             }]
         },
         options: {

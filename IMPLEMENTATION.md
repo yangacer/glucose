@@ -108,7 +108,7 @@ def get_db_connection():
 - **Formula:** `f(G) = 1.509 × (ln(G)^1.084 - 5.381)`
 - **LBGI:** Averages low-risk values where f(G) < 0
 - **HBGI:** Averages high-risk values where f(G) > 0
-- **ADRR:** Groups by calendar day, sums LBGI + HBGI per day, averages across days
+- **ADRR (per window):** Computed as `LBGI + HBGI` directly on the window's readings — no calendar-day grouping. This ensures consistency with LBGI/HBGI and avoids null results when UTC timestamps split a local-time window across calendar dates. `calculate_adrr()` (daily-grouping variant) is retained but not used by `calculate_adrr_data()`.
 
 ### Glucose & Insulin Prediction
 - **Function:** `predict_next_window(lookback_days=30)`
@@ -273,6 +273,7 @@ See `DEPLOY.md` for detailed workflow documentation.
 - Consistent configuration across similar chart types
 - `drawTime: 'beforeDatasetsDraw'` for threshold bands
 - Reusable rendering functions with parameters for thresholds
+- `spanGaps: true` on risk metric datasets to bridge null values (windows with insufficient readings)
 
 ### Data Loading
 - Async/await for API calls

@@ -305,6 +305,10 @@ def calculate_risk_metric_data(glucose_rows, windows, metric_type):
 def calculate_adrr_data(glucose_rows, windows):
     """Calculate ADRR for each time window.
 
+    ADRR per window = LBGI + HBGI computed directly on that window's readings.
+    This mirrors how calculate_lbgi/hbgi work and avoids incorrect UTC date-grouping
+    for sub-day windows that cross UTC midnight.
+
     Args:
         glucose_rows: List of (timestamp_str, level) tuples
         windows: List of (label, start, end) tuples
@@ -315,14 +319,15 @@ def calculate_adrr_data(glucose_rows, windows):
     result = []
 
     for label, window_start, window_end in windows:
-        # Filter glucose data for this window
-        window_rows = [
-            (ts, level) for ts, level in glucose_rows
+        window_data = [
+            (datetime.strptime(ts, '%Y-%m-%d %H:%M:%S'), level)
+            for ts, level in glucose_rows
             if window_start <= ts <= window_end
         ]
 
-        # Calculate ADRR for this window (treats window as full period)
-        adrr = calculate_adrr(window_rows, [(label, window_start, window_end)])
+        lbgi = calculate_lbgi(window_data)
+        hbgi = calculate_hbgi(window_data)
+        adrr = (lbgi + hbgi) if (lbgi is not None and hbgi is not None) else None
         result.append({
             'label': label,
             'value': round(adrr, 2) if adrr is not None else None
