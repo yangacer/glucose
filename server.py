@@ -33,10 +33,12 @@ SERVER_KEY_PATH = os.environ.get('SERVER_KEY', os.path.join(CERTS_DIR, 'server',
 @contextmanager
 def get_db_connection():
     """Context manager for database connections with automatic cleanup."""
-    conn = sqlite3.connect(DB_PATH)
-    conn.execute('PRAGMA journal_mode=WAL')
+    conn = sqlite3.connect(DB_PATH, timeout=30)
     try:
         yield conn
+    except Exception:
+        conn.rollback()
+        raise
     finally:
         conn.close()
 
@@ -889,18 +891,20 @@ class DataAccess:
 
     @staticmethod
     def create_intake(nutrition_id, timestamp, nutrition_amount):
-        kcal_per_gram = execute_query(
-            'SELECT kcal_per_gram FROM nutrition WHERE id = ?',
-            (nutrition_id,), fetch_one=True)
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('SELECT kcal_per_gram FROM nutrition WHERE id = ?', (nutrition_id,))
+            kcal_per_gram = cursor.fetchone()
 
-        if not kcal_per_gram:
-            raise ValueError('Nutrition not found')
+            if not kcal_per_gram:
+                raise ValueError('Nutrition not found')
 
-        nutrition_kcal = nutrition_amount * kcal_per_gram[0]
-        execute_query('''INSERT INTO intake
-                        (nutrition_id, timestamp, nutrition_amount, nutrition_kcal)
-                        VALUES (?, ?, ?, ?)''',
-                     (nutrition_id, timestamp, nutrition_amount, nutrition_kcal), commit=True)
+            nutrition_kcal = nutrition_amount * kcal_per_gram[0]
+            cursor.execute('''INSERT INTO intake
+                            (nutrition_id, timestamp, nutrition_amount, nutrition_kcal)
+                            VALUES (?, ?, ?, ?)''',
+                         (nutrition_id, timestamp, nutrition_amount, nutrition_kcal))
+            conn.commit()
         return nutrition_kcal
 
     @staticmethod
@@ -943,18 +947,20 @@ class DataAccess:
 
     @staticmethod
     def update_intake(record_id, nutrition_id, timestamp, nutrition_amount):
-        kcal_per_gram = execute_query(
-            'SELECT kcal_per_gram FROM nutrition WHERE id = ?',
-            (nutrition_id,), fetch_one=True)
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('SELECT kcal_per_gram FROM nutrition WHERE id = ?', (nutrition_id,))
+            kcal_per_gram = cursor.fetchone()
 
-        if not kcal_per_gram:
-            raise ValueError('Nutrition not found')
+            if not kcal_per_gram:
+                raise ValueError('Nutrition not found')
 
-        nutrition_kcal = nutrition_amount * kcal_per_gram[0]
-        execute_query('''UPDATE intake
-                        SET timestamp = ?, nutrition_id = ?, nutrition_amount = ?, nutrition_kcal = ?
-                        WHERE id = ?''',
-                     (timestamp, nutrition_id, nutrition_amount, nutrition_kcal, record_id), commit=True)
+            nutrition_kcal = nutrition_amount * kcal_per_gram[0]
+            cursor.execute('''UPDATE intake
+                            SET timestamp = ?, nutrition_id = ?, nutrition_amount = ?, nutrition_kcal = ?
+                            WHERE id = ?''',
+                         (timestamp, nutrition_id, nutrition_amount, nutrition_kcal, record_id))
+            conn.commit()
 
     @staticmethod
     def update_supplement_master(record_id, supplement_name, default_amount=1):
@@ -1564,6 +1570,10 @@ def main():
     if not os.path.exists(DB_PATH):
         print(f"Error: Database {DB_PATH} not found. Please run init_db.py first.")
         return
+
+    # Set WAL mode once at startup (it persists in the DB file)
+    with get_db_connection() as conn:
+        conn.execute('PRAGMA journal_mode=WAL')
 
     socketserver.TCPServer.allow_reuse_address = True
     socketserver.ThreadingTCPServer.daemon_threads = True
