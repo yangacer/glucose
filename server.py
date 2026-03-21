@@ -7,6 +7,9 @@ import sqlite3
 import urllib.parse
 import math
 import queue
+import logging
+import sys
+import time
 from datetime import datetime, date, timedelta, timezone, time as dt_time
 from contextlib import contextmanager
 from zoneinfo import ZoneInfo
@@ -19,6 +22,33 @@ DB_PATH = os.environ.get('DB_PATH', 'glucose.db')
 DB_POOL_SIZE = int(os.environ.get('DB_POOL_SIZE', '5'))
 
 DEBUG_STATIC = os.environ.get('DEBUG_STATIC', 'false').lower() == 'true'
+
+# Logging — all output (requests, errors, startup) unified on stdout
+class _CompactFormatter(logging.Formatter):
+    converter = time.gmtime  # use UTC, not local time
+    _ABBREV = {
+        logging.DEBUG:    'D',
+        logging.INFO:     'I',
+        logging.WARNING:  'W',
+        logging.ERROR:    'E',
+        logging.CRITICAL: 'C',
+    }
+
+    def format(self, record):
+        record.levelname = self._ABBREV.get(record.levelno, record.levelname[0])
+        return super().format(record)
+
+_handler = logging.StreamHandler(sys.stdout)
+_handler.setFormatter(_CompactFormatter(
+    fmt='%(asctime)s %(levelname)s %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S',
+))
+logging.basicConfig(
+    handlers=[_handler],
+    level=getattr(logging, os.environ.get('LOG_LEVEL', 'INFO').upper(), logging.INFO),
+)
+logger = logging.getLogger(__name__)
+logger.info("All timestamps are UTC")
 
 # mTLS Configuration
 MTLS_ENABLED = os.environ.get('MTLS_ENABLED', 'true').lower() == 'true'
@@ -1092,9 +1122,8 @@ class GlucoseHandler(http.server.SimpleHTTPRequestHandler):
         self._set_headers()
 
     def log_message(self, format, *args):
-        """Override to add timestamp to request logs"""
-        timestamp = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
-        print(f"[{timestamp}] {format % args}")
+        """Route HTTP request logs through the standard logger."""
+        logger.info(format % args)
 
     def do_GET(self):
         try:
@@ -1513,8 +1542,7 @@ class GlucoseHandler(http.server.SimpleHTTPRequestHandler):
             result = predict_next_window(lookback_days, tz_name)
             self._send_json(result)
         except Exception as e:
-            import traceback
-            traceback.print_exc()
+            logger.exception("Prediction error: %s", e)
             self._send_json({
                 'error': 'prediction_failed',
                 'message': str(e),
@@ -1535,17 +1563,16 @@ def check_certificate_expiration(cert_path):
             capture_output=True, text=True
         )
         if result.returncode == 0:
-            # Parse expiration date
             date_str = result.stdout.strip().split('=')[1]
             exp_date = datetime.strptime(date_str, '%b %d %H:%M:%S %Y %Z')
             days_left = (exp_date - datetime.now()).days
 
-            if days_left < 30:
-                print(f"WARNING: Certificate {cert_path} expires in {days_left} days!")
-            elif days_left < 0:
-                print(f"ERROR: Certificate {cert_path} has EXPIRED!")
+            if days_left < 0:
+                logger.error("Certificate %s has EXPIRED!", cert_path)
+            elif days_left < 30:
+                logger.warning("Certificate %s expires in %d days!", cert_path, days_left)
     except Exception as e:
-        print(f"Could not check certificate expiration: {e}")
+        logger.warning("Could not check certificate expiration: %s", e)
 
 
 def create_ssl_context():
@@ -1567,11 +1594,6 @@ def create_ssl_context():
     # Configure cipher suites (prefer strong ciphers)
     context.set_ciphers('HIGH:!aNULL:!MD5:!RC4')
 
-    print(f"mTLS Configuration:")
-    print(f"  CA Certificate: {CA_CERT_PATH}")
-    print(f"  Server Certificate: {SERVER_CERT_PATH}")
-    print(f"  Server Key: {SERVER_KEY_PATH}")
-
     # Check certificate expiration
     check_certificate_expiration(SERVER_CERT_PATH)
 
@@ -1585,11 +1607,16 @@ def log_client_certificate(request, client_address):
         if cert:
             subject = dict(x[0] for x in cert['subject'])
             cn = subject.get('commonName', 'Unknown')
-            print(f"Client connected: {cn} from {client_address[0]}")
-        else:
-            print(f"Client connected (no cert) from {client_address[0]}")
+            logger.info("Client connected: %s from %s", cn, client_address[0])
     except Exception as e:
-        print(f"Could not retrieve client certificate: {e}")
+        logger.warning("Could not retrieve client certificate: %s", e)
+
+
+class GlucoseServer(socketserver.ThreadingTCPServer):
+    """ThreadingTCPServer with handle_error routed through the standard logger."""
+
+    def handle_error(self, request, client_address):
+        logger.exception("Unhandled exception processing request from %s", client_address[0])
 
 
 class SecureGlucoseHandler(GlucoseHandler):
@@ -1602,7 +1629,7 @@ class SecureGlucoseHandler(GlucoseHandler):
 
 def main():
     if not os.path.exists(DB_PATH):
-        print(f"Error: Database {DB_PATH} not found. Please run init_db.py first.")
+        logger.error("Database %s not found. Please run init_db.py first.", DB_PATH)
         return
 
     global _db_pool
@@ -1612,36 +1639,35 @@ def main():
     with get_db_connection() as conn:
         conn.execute('PRAGMA journal_mode=WAL')
 
-    socketserver.TCPServer.allow_reuse_address = True
-    socketserver.ThreadingTCPServer.daemon_threads = True
+    GlucoseServer.allow_reuse_address = True
+    GlucoseServer.daemon_threads = True
 
     if MTLS_ENABLED:
         # Check if certificate files exist
         if not all(os.path.exists(p) for p in [CA_CERT_PATH, SERVER_CERT_PATH, SERVER_KEY_PATH]):
-            print("ERROR: mTLS is enabled but certificate files not found!")
-            print("Please run ./generate-certs.sh to generate certificates.")
-            print("Or set MTLS_ENABLED=false to disable mTLS.")
+            logger.error("mTLS is enabled but certificate files not found!")
+            logger.error("Run ./generate-certs.sh to generate certificates, "
+                         "or set MTLS_ENABLED=false to disable mTLS.")
             return
 
         # Create HTTPS server with mTLS (multi-threaded)
-        with socketserver.ThreadingTCPServer(("", PORT), SecureGlucoseHandler) as httpd:
+        with GlucoseServer(("", PORT), SecureGlucoseHandler) as httpd:
             ssl_context = create_ssl_context()
             httpd.socket = ssl_context.wrap_socket(httpd.socket, server_side=True)
 
-            print(f"✓ mTLS enabled - Server running at https://localhost:{PORT}/")
-            print(f"  Clients must present valid certificates signed by the CA")
-            print(f"  Multi-threaded mode: Handles concurrent requests")
-            print(f"  See CLIENT.md for client configuration instructions")
-            print(f"  Static: {'index.html.dev (DEBUG_STATIC)' if DEBUG_STATIC else 'index.html'}")
+            logger.info("mTLS enabled - Server running at https://localhost:%d/", PORT)
+            logger.info("Clients must present valid certificates signed by the CA")
+            logger.info("Static: %s",
+                        'index.html.dev (DEBUG_STATIC)' if DEBUG_STATIC else 'index.html')
             httpd.serve_forever()
     else:
         # Run without mTLS (development mode, multi-threaded)
-        print("WARNING: mTLS is DISABLED - running in insecure mode!")
-        print(f"Server running at http://localhost:{PORT}/")
-        print(f"Multi-threaded mode: Handles concurrent requests")
-        print(f"Static: {'index.html.dev (DEBUG_STATIC)' if DEBUG_STATIC else 'index.html'}")
+        logger.warning("mTLS is DISABLED - running in insecure mode!")
+        logger.info("Server running at http://localhost:%d/", PORT)
+        logger.info("Static: %s",
+                    'index.html.dev (DEBUG_STATIC)' if DEBUG_STATIC else 'index.html')
 
-        with socketserver.ThreadingTCPServer(("", PORT), GlucoseHandler) as httpd:
+        with GlucoseServer(("", PORT), GlucoseHandler) as httpd:
             httpd.serve_forever()
 
 
