@@ -6,6 +6,7 @@ import json
 import sqlite3
 import urllib.parse
 import math
+import queue
 from datetime import datetime, date, timedelta, timezone, time as dt_time
 from contextlib import contextmanager
 from zoneinfo import ZoneInfo
@@ -15,6 +16,7 @@ from collections import defaultdict
 
 PORT = int(os.environ.get('PORT', '8443'))  # Default HTTPS port for mTLS
 DB_PATH = os.environ.get('DB_PATH', 'glucose.db')
+DB_POOL_SIZE = int(os.environ.get('DB_POOL_SIZE', '5'))
 
 DEBUG_STATIC = os.environ.get('DEBUG_STATIC', 'false').lower() == 'true'
 
@@ -27,20 +29,52 @@ SERVER_KEY_PATH = os.environ.get('SERVER_KEY', os.path.join(CERTS_DIR, 'server',
 
 
 # ============================================================================
-# Database Helper Functions
+# Database Connection Pool
 # ============================================================================
+
+class ConnectionPool:
+    """
+    Fixed-size SQLite connection pool backed by a Queue.
+
+    Connections are created once at startup and reused across requests.
+    check_same_thread=False is required because ThreadingTCPServer hands
+    the same connection object to different threads over time (never
+    concurrently — the Queue ensures exclusive access per checkout).
+    """
+
+    def __init__(self, db_path, size, timeout=30):
+        self._db_path = db_path
+        self._timeout = timeout
+        self._pool = queue.Queue(maxsize=size)
+        for _ in range(size):
+            self._pool.put(self._new_connection())
+
+    def _new_connection(self):
+        return sqlite3.connect(self._db_path, timeout=self._timeout, check_same_thread=False)
+
+    @contextmanager
+    def connection(self):
+        try:
+            conn = self._pool.get(timeout=self._timeout)
+        except queue.Empty:
+            raise RuntimeError('Database connection pool exhausted')
+        try:
+            yield conn
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            self._pool.put(conn)
+
+
+_db_pool: ConnectionPool | None = None
+
 
 @contextmanager
 def get_db_connection():
-    """Context manager for database connections with automatic cleanup."""
-    conn = sqlite3.connect(DB_PATH, timeout=30)
-    try:
+    """Borrow a connection from the pool; return it automatically on exit."""
+    with _db_pool.connection() as conn:
         yield conn
-    except Exception:
-        conn.rollback()
-        raise
-    finally:
-        conn.close()
 
 
 def execute_query(query, params=(), fetch_one=False, commit=False):
@@ -1570,6 +1604,9 @@ def main():
     if not os.path.exists(DB_PATH):
         print(f"Error: Database {DB_PATH} not found. Please run init_db.py first.")
         return
+
+    global _db_pool
+    _db_pool = ConnectionPool(DB_PATH, size=DB_POOL_SIZE)
 
     # Set WAL mode once at startup (it persists in the DB file)
     with get_db_connection() as conn:
