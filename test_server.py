@@ -22,8 +22,10 @@ import json
 import sqlite3
 import os
 import sys
+import tempfile
 from datetime import datetime, timedelta
 from http.client import HTTPConnection
+from unittest.mock import patch, MagicMock
 import time
 import subprocess
 from init_db import create_schema
@@ -651,6 +653,216 @@ class TestGlucoseAPI(unittest.TestCase):
         
         # Check warnings is a list
         self.assertIsInstance(data['warnings'], list)
+
+
+    def test_29_post_missing_required_field(self):
+        """Missing required field in POST body returns 500 (KeyError not caught as 400)"""
+        data = {'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S')}  # missing 'level'
+        status, response = self.make_request('POST', '/api/glucose', data)
+        self.assertEqual(status, 500)
+        self.assertIn('error', response)
+
+    def test_30_post_malformed_json(self):
+        """Malformed JSON body returns 400"""
+        conn = HTTPConnection(self.host, self.port)
+        conn.request('POST', '/api/glucose', b'not valid json {{{',
+                     {'Content-Type': 'application/json'})
+        response = conn.getresponse()
+        body = json.loads(response.read().decode())
+        conn.close()
+        self.assertEqual(response.status, 400)
+        self.assertIn('error', body)
+
+    def test_31_post_unknown_route(self):
+        """POST to an unknown API route returns 404"""
+        status, response = self.make_request('POST', '/api/nonexistent',
+                                             {'foo': 'bar'})
+        self.assertEqual(status, 404)
+        self.assertIn('error', response)
+
+    def test_32_delete_nonexistent_record(self):
+        """DELETE on a non-existent record ID silently succeeds (SQLite DELETE is no-op)"""
+        status, response = self.make_request('DELETE', '/api/glucose/9999999')
+        self.assertEqual(status, 200)
+        self.assertTrue(response.get('success'))
+
+
+
+
+# =============================================================================
+# Unit tests for ConnectionPool (mocked sqlite3, no real DB)
+# =============================================================================
+
+class TestConnectionPool(unittest.TestCase):
+    """Pure unit tests for ConnectionPool using mocked sqlite3 connections."""
+
+    @patch('server.sqlite3.connect')
+    def test_creates_correct_number_of_connections(self, mock_connect):
+        """Pool creates exactly 'size' connections at startup."""
+        from server import ConnectionPool
+        mock_connect.return_value = MagicMock()
+        ConnectionPool(':memory:', size=3)
+        self.assertEqual(mock_connect.call_count, 3)
+
+    @patch('server.sqlite3.connect')
+    def test_checkout_yields_connection(self, mock_connect):
+        """Context manager yields the pooled connection."""
+        from server import ConnectionPool
+        mock_conn = MagicMock()
+        mock_connect.return_value = mock_conn
+        pool = ConnectionPool(':memory:', size=1)
+        with pool.connection() as conn:
+            self.assertIs(conn, mock_conn)
+
+    @patch('server.sqlite3.connect')
+    def test_connection_returned_to_pool_after_use(self, mock_connect):
+        """Pool size is restored after the context exits normally."""
+        from server import ConnectionPool
+        mock_connect.return_value = MagicMock()
+        pool = ConnectionPool(':memory:', size=2)
+        self.assertEqual(pool._pool.qsize(), 2)
+        with pool.connection():
+            self.assertEqual(pool._pool.qsize(), 1)
+        self.assertEqual(pool._pool.qsize(), 2)
+
+    @patch('server.sqlite3.connect')
+    def test_rollback_called_on_exception(self, mock_connect):
+        """rollback() is called on the connection when an exception occurs."""
+        from server import ConnectionPool
+        mock_conn = MagicMock()
+        mock_connect.return_value = mock_conn
+        pool = ConnectionPool(':memory:', size=1)
+        with self.assertRaises(ValueError):
+            with pool.connection():
+                raise ValueError('simulated error')
+        mock_conn.rollback.assert_called_once()
+
+    @patch('server.sqlite3.connect')
+    def test_connection_returned_after_exception(self, mock_connect):
+        """Connection is returned to pool even when an exception is raised."""
+        from server import ConnectionPool
+        mock_connect.return_value = MagicMock()
+        pool = ConnectionPool(':memory:', size=1)
+        try:
+            with pool.connection():
+                raise RuntimeError('boom')
+        except RuntimeError:
+            pass
+        self.assertEqual(pool._pool.qsize(), 1)
+
+    @patch('server.sqlite3.connect')
+    def test_pool_exhaustion_raises_runtime_error(self, mock_connect):
+        """RuntimeError is raised when the pool is empty and timeout expires."""
+        from server import ConnectionPool
+        mock_connect.return_value = MagicMock()
+        pool = ConnectionPool(':memory:', size=1, timeout=0.1)
+        pool._pool.get()  # drain the single connection to simulate full checkout
+        with self.assertRaises(RuntimeError) as ctx:
+            with pool.connection():
+                pass
+        self.assertIn('exhausted', str(ctx.exception))
+
+
+# =============================================================================
+# Unit tests for DataAccess methods (temp file DB, no subprocess/HTTP)
+# =============================================================================
+
+class TestDataAccessUnit(unittest.TestCase):
+    """
+    Unit tests for DataAccess static methods.
+    Uses a real temporary SQLite DB and patches server._db_pool so no HTTP
+    server or subprocess is needed.
+    """
+
+    def setUp(self):
+        self.db_fd, self.db_path = tempfile.mkstemp(suffix='.db')
+        conn = sqlite3.connect(self.db_path)
+        create_schema(conn)
+        conn.close()
+
+        import server
+        self.pool = server.ConnectionPool(self.db_path, size=2)
+        self.patcher = patch('server._db_pool', self.pool)
+        self.patcher.start()
+
+    def tearDown(self):
+        self.patcher.stop()
+        os.close(self.db_fd)
+        os.unlink(self.db_path)
+
+    def _insert_nutrition(self, name='Apple', kcal=52, weight=100):
+        from server import DataAccess
+        DataAccess.create_nutrition(name, kcal, weight)
+        return DataAccess.get_nutrition_list()[-1]['id']
+
+    def test_create_and_retrieve_nutrition(self):
+        """create_nutrition inserts a record retrievable via get_nutrition_list."""
+        from server import DataAccess
+        DataAccess.create_nutrition('Banana', 89, 100)
+        items = DataAccess.get_nutrition_list()
+        self.assertEqual(len(items), 1)
+        self.assertEqual(items[0]['nutrition_name'], 'Banana')
+        self.assertAlmostEqual(items[0]['kcal_per_gram'], 0.89, places=2)
+
+    def test_create_intake_calculates_kcal_correctly(self):
+        """create_intake returns the correctly calculated kcal value."""
+        from server import DataAccess
+        nutrition_id = self._insert_nutrition(kcal=52, weight=100)  # 0.52 kcal/g
+        kcal = DataAccess.create_intake(nutrition_id, '2026-03-21 08:00:00', 200.0)
+        self.assertAlmostEqual(kcal, 104.0, places=2)  # 200g * 0.52 kcal/g
+
+    def test_create_intake_invalid_nutrition_raises_value_error(self):
+        """create_intake raises ValueError when nutrition_id does not exist."""
+        from server import DataAccess
+        with self.assertRaises(ValueError):
+            DataAccess.create_intake(99999, '2026-03-21 08:00:00', 100.0)
+
+    def test_create_intake_is_atomic(self):
+        """Failed create_intake (bad nutrition_id) leaves no partial intake row."""
+        from server import DataAccess, execute_query
+        before = execute_query('SELECT COUNT(*) FROM intake', fetch_one=True)[0]
+        try:
+            DataAccess.create_intake(99999, '2026-03-21 08:00:00', 100.0)
+        except ValueError:
+            pass
+        after = execute_query('SELECT COUNT(*) FROM intake', fetch_one=True)[0]
+        self.assertEqual(before, after)
+
+    def test_update_intake_recalculates_kcal(self):
+        """update_intake stores the recalculated kcal for the new amount."""
+        from server import DataAccess, execute_query
+        nutrition_id = self._insert_nutrition(kcal=52, weight=100)
+        DataAccess.create_intake(nutrition_id, '2026-03-21 08:00:00', 100.0)
+        row_id = execute_query('SELECT id FROM intake', fetch_one=True)[0]
+        DataAccess.update_intake(row_id, nutrition_id, '2026-03-21 09:00:00', 300.0)
+        updated_kcal = execute_query('SELECT nutrition_kcal FROM intake WHERE id=?',
+                                     (row_id,), fetch_one=True)[0]
+        self.assertAlmostEqual(updated_kcal, 156.0, places=2)  # 300g * 0.52 kcal/g
+
+    def test_update_intake_invalid_nutrition_raises_value_error(self):
+        """update_intake raises ValueError when nutrition_id does not exist."""
+        from server import DataAccess
+        with self.assertRaises(ValueError):
+            DataAccess.update_intake(1, 99999, '2026-03-21 08:00:00', 100.0)
+
+    def test_delete_record_removes_row(self):
+        """delete_record removes exactly the targeted row."""
+        from server import DataAccess, execute_query
+        DataAccess.create_glucose('2026-03-21 08:00:00', 95)
+        row_id = execute_query('SELECT id FROM glucose', fetch_one=True)[0]
+        DataAccess.delete_record('glucose', row_id)
+        result = execute_query('SELECT id FROM glucose WHERE id=?', (row_id,), fetch_one=True)
+        self.assertIsNone(result)
+
+    def test_create_glucose_and_insulin(self):
+        """create_glucose and create_insulin each insert one row."""
+        from server import DataAccess, execute_query
+        DataAccess.create_glucose('2026-03-21 08:00:00', 95)
+        DataAccess.create_insulin('2026-03-21 08:05:00', 4.0)
+        g = execute_query('SELECT COUNT(*) FROM glucose', fetch_one=True)[0]
+        i = execute_query('SELECT COUNT(*) FROM insulin', fetch_one=True)[0]
+        self.assertEqual(g, 1)
+        self.assertEqual(i, 1)
 
 
 if __name__ == '__main__':
