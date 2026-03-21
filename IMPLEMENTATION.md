@@ -49,22 +49,38 @@ This document describes the technical implementation details for developers. For
 
 **File:** `server.py`
 
-**Pattern:** Context manager with automatic cleanup
+**Pattern:** Fixed-size connection pool with context manager checkout
 
 ```python
+class ConnectionPool:
+    # queue.Queue of pre-created connections (check_same_thread=False)
+    # Blocks up to timeout seconds waiting for a free connection
+    # Calls conn.rollback() and re-raises on exception; always returns conn to pool
+
+_db_pool: ConnectionPool | None = None  # initialised in main()
+
 @contextmanager
 def get_db_connection():
-    # Yields connection, automatically closes on exit/exception
+    with _db_pool.connection() as conn:
+        yield conn
 ```
 
-**Usage:** All database operations use `with get_db_connection() as conn:`
+**Pool configuration:**
+- `DB_POOL_SIZE` env var (default: `5`) sets pool size at startup
+- `timeout=30` on both the SQLite lock wait and the pool queue wait
+- `PRAGMA journal_mode=WAL` is set **once** in `main()` — it persists in the DB file
+
+**Usage:** All database operations use `with get_db_connection() as conn:` or `execute_query()`
+
+**Multi-step atomicity:** Operations that require a SELECT followed by an INSERT/UPDATE
+(e.g. `create_intake`, `update_intake`) share a **single checked-out connection** so
+both statements execute inside one atomic transaction.
 
 **Benefits:**
-- Prevents connection leaks
-- Exception-safe cleanup
-- No manual close() calls
-
-**Design Decision:** No connection pooling - single connection per request is sufficient for low-traffic personal app.
+- Eliminates per-request connection open/close overhead
+- Explicit `rollback()` on error before returning connection to pool
+- `check_same_thread=False` is safe: the Queue guarantees exclusive access — no two threads hold the same connection simultaneously
+- `RuntimeError('Database connection pool exhausted')` if all connections are busy beyond timeout
 
 ---
 
@@ -598,22 +614,25 @@ to run the same migration twice.
 
 **File:** `test_server.py`
 
-**Key Improvements:**
-- Reuses `init_db.create_schema()` - no duplicate schema code
-- Uses standard `unittest.TestCase` with `setUpClass`/`tearDownClass`
-- Context managers ensure cleanup
-- Connection retry for server startup
+**Three test classes:**
+
+| Class | Type | Setup | Purpose |
+|---|---|---|---|
+| `TestConnectionPool` | Unit | Mocked `sqlite3.connect` | Verify pool lifecycle, rollback, exhaustion |
+| `TestDataAccessUnit` | Unit | Temp file DB + patched `_db_pool` | Verify DataAccess methods, kcal calculation, atomicity |
+| `TestGlucoseAPI` | Integration | Subprocess server on port 8001 | Full HTTP request → DB → response cycle |
 
 **Test Execution:**
-1. `setUpClass`: Creates test DB, starts server on port 8001
-2. Tests run in numbered order (test_01 through test_29)
-3. `tearDownClass`: Stops server, removes test DB
+1. `TestConnectionPool` and `TestDataAccessUnit` run first (no server needed)
+2. `TestGlucoseAPI.setUpClass`: Creates test DB, starts server subprocess on port 8001
+3. Integration tests run in numbered order (test_01 through test_32)
+4. `TestGlucoseAPI.tearDownClass`: Stops server, removes test DB
 
 **Test Coverage:**
-- 29 tests covering all API endpoints
-- Unit tests for calculation functions
-- Integration tests for dashboard endpoints
-- Error handling validation
+- 48 tests total
+- 6 `TestConnectionPool` tests: connection creation, checkout, return-to-pool, rollback, exhaustion
+- 8 `TestDataAccessUnit` tests: CRUD methods, kcal calculation, atomicity of multi-step operations
+- 34 `TestGlucoseAPI` tests: all API endpoints, calculation functions, error paths (missing fields, malformed JSON, unknown routes)
 
 ---
 
