@@ -26,6 +26,7 @@ Access `https://localhost:8443/` in your browser. For mTLS client setup, see [`C
 | `MTLS_ENABLED` | `true` | Enable mutual TLS |
 | `DEBUG_STATIC` | `false` | Serve unminified JS (`index.html.dev`) for frontend debugging |
 | `DB_PATH` | `glucose.db` | SQLite database file path |
+| `DB_POOL_SIZE` | `5` | Number of persistent SQLite connections in the pool |
 | `CA_CERT` | `certs/ca/ca-cert.pem` | CA certificate path |
 | `SERVER_CERT` | `certs/server/server-cert.pem` | Server certificate path |
 | `SERVER_KEY` | `certs/server/server-key.pem` | Server private key path |
