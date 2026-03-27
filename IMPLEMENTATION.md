@@ -19,10 +19,21 @@ This document describes the technical implementation details for developers. For
 - `test_server.py`: Test suite
 
 **Threading Model:**
-- Uses `socketserver.ThreadingTCPServer` for concurrent request handling
-- Each request handled in separate daemon thread
+- Uses `socketserver.ThreadingTCPServer` backed by a `ThreadPoolExecutor` for concurrent request handling
+- Worker pool is bounded (`MAX_WORKERS`, default 20) to prevent unbounded thread/memory growth under load
+- Excess connections beyond pool capacity are rejected immediately (socket closed) rather than queued silently
+- Each request handled by a pool worker; threads reused across requests
 - Prevents one slow request from blocking others
-- Threads automatically cleaned up when request completes
+
+**DoS Hardening:**
+- `MAX_BODY_BYTES` (default 64 KB) — POST/PUT bodies exceeding limit rejected with HTTP 413
+- `REQUEST_TIMEOUT` (default 30s) — socket read timeout applied per connection; slow/idle clients are disconnected
+- TLS handshake performed on worker threads (not the main accept loop) so a stalled TLS client cannot block new connections
+
+**Environment Variables:**
+- `MAX_WORKERS` — bounded thread pool size (default: 20)
+- `MAX_BODY_BYTES` — maximum request body size in bytes (default: 65536)
+- `REQUEST_TIMEOUT` — socket read/write timeout in seconds (default: 30)
 
 ---
 
@@ -590,6 +601,7 @@ to run the same migration twice.
 - `ssl.CERT_REQUIRED` - Mandatory client certificate
 - TLS 1.2+ minimum version
 - Directory listing disabled (403 Forbidden)
+- TLS handshake deferred to worker threads (`do_handshake_on_connect=False`) — a stalled TLS negotiation times out via `REQUEST_TIMEOUT` and cannot block the main accept loop
 
 ## Certificate Generation
 
@@ -819,8 +831,8 @@ PORT=8443 python3 server.py
 
 **1. Single-threaded server (FIXED)**
 - **Problem:** `TCPServer` handles one request at a time
-- **Solution:** Now uses `ThreadingTCPServer` for concurrent requests
-- **Impact:** One slow/hanging request won't block others
+- **Solution:** Now uses `ThreadingTCPServer` backed by a bounded `ThreadPoolExecutor` for concurrent requests
+- **Impact:** One slow/hanging request won't block others; pool cap prevents resource exhaustion
 
 **2. Unhandled exceptions (FIXED)**
 - **Problem:** Exception in request handler leaves client waiting forever
@@ -836,6 +848,11 @@ PORT=8443 python3 server.py
 - **Problem:** Malformed JSON in POST/PUT causes uncaught exception
 - **Solution:** Separate try-except for JSON parsing returns 400 error
 - **Impact:** Client receives clear error message
+
+**5. TLS handshake blocking accept loop (FIXED)**
+- **Problem:** With `do_handshake_on_connect=True` (Python default), a client that completes the TCP handshake but stalls during TLS negotiation blocks the main thread inside `accept()`, preventing any new connections
+- **Solution:** `do_handshake_on_connect=False`; handshake moved into `SecureGlucoseHandler.setup()` on a worker thread where `REQUEST_TIMEOUT` applies
+- **Impact:** Stalled TLS clients time out in 30 s without affecting the accept loop
 
 **Diagnostic Steps:**
 ```bash

@@ -10,6 +10,7 @@ import queue
 import logging
 import sys
 import time
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, date, timedelta, timezone, time as dt_time
 from contextlib import contextmanager
 from zoneinfo import ZoneInfo
@@ -20,6 +21,9 @@ from collections import defaultdict
 PORT = int(os.environ.get('PORT', '8443'))  # Default HTTPS port for mTLS
 DB_PATH = os.environ.get('DB_PATH', 'glucose.db')
 DB_POOL_SIZE = int(os.environ.get('DB_POOL_SIZE', '5'))
+MAX_BODY_BYTES = int(os.environ.get('MAX_BODY_BYTES', str(64 * 1024)))  # 64 KB
+MAX_WORKERS = int(os.environ.get('MAX_WORKERS', '20'))
+REQUEST_TIMEOUT = int(os.environ.get('REQUEST_TIMEOUT', '30'))  # seconds
 
 DEBUG_STATIC = os.environ.get('DEBUG_STATIC', 'false').lower() == 'true'
 
@@ -1088,6 +1092,9 @@ class DataAccess:
 
 class GlucoseHandler(http.server.SimpleHTTPRequestHandler):
 
+    # Close idle/slow connections after this many seconds (Slowloris mitigation)
+    timeout = REQUEST_TIMEOUT
+
     def guess_type(self, path):
         """Override to properly handle .dev extension as HTML."""
         if path.endswith('.html.dev'):
@@ -1164,6 +1171,9 @@ class GlucoseHandler(http.server.SimpleHTTPRequestHandler):
     def do_POST(self):
         try:
             content_length = int(self.headers['Content-Length'])
+            if content_length > MAX_BODY_BYTES:
+                self._send_error_json(f'Request body too large (max {MAX_BODY_BYTES} bytes)', 413)
+                return
             post_data = self.rfile.read(content_length)
             data = json.loads(post_data.decode('utf-8'))
         except (ValueError, json.JSONDecodeError) as e:
@@ -1209,6 +1219,9 @@ class GlucoseHandler(http.server.SimpleHTTPRequestHandler):
     def do_PUT(self):
         try:
             content_length = int(self.headers['Content-Length'])
+            if content_length > MAX_BODY_BYTES:
+                self._send_error_json(f'Request body too large (max {MAX_BODY_BYTES} bytes)', 413)
+                return
             raw_body = self.rfile.read(content_length)
             data = json.loads(raw_body.decode('utf-8'))
         except (ValueError, json.JSONDecodeError) as e:
@@ -1613,7 +1626,19 @@ def log_client_certificate(request, client_address):
 
 
 class GlucoseServer(socketserver.ThreadingTCPServer):
-    """ThreadingTCPServer with handle_error routed through the standard logger."""
+    """ThreadingTCPServer with a bounded worker pool and error logging."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._executor = ThreadPoolExecutor(max_workers=MAX_WORKERS)
+
+    def process_request(self, request, client_address):
+        """Submit each request to the bounded pool instead of spawning unbounded threads."""
+        self._executor.submit(self.process_request_thread, request, client_address)
+
+    def server_close(self):
+        self._executor.shutdown(wait=False)
+        super().server_close()
 
     def handle_error(self, request, client_address):
         logger.exception("Unhandled exception processing request from %s", client_address[0])
@@ -1623,7 +1648,17 @@ class SecureGlucoseHandler(GlucoseHandler):
     """Extended handler that logs client certificate info."""
 
     def setup(self):
+        # super().setup() calls self.connection.settimeout(REQUEST_TIMEOUT),
+        # so the handshake below is bounded by that timeout.
         super().setup()
+        try:
+            self.request.do_handshake()
+        except ssl.SSLError as e:
+            logger.warning("TLS handshake failed from %s: %s", self.client_address[0], e)
+            raise
+        except OSError as e:
+            logger.warning("TLS handshake I/O error from %s: %s", self.client_address[0], e)
+            raise
         log_client_certificate(self.request, self.client_address)
 
 
@@ -1653,7 +1688,13 @@ def main():
         # Create HTTPS server with mTLS (multi-threaded)
         with GlucoseServer(("", PORT), SecureGlucoseHandler) as httpd:
             ssl_context = create_ssl_context()
-            httpd.socket = ssl_context.wrap_socket(httpd.socket, server_side=True)
+            # do_handshake_on_connect=False defers the TLS handshake out of
+            # accept() on the main thread.  The handshake is performed in
+            # SecureGlucoseHandler.setup() on a worker thread, where the
+            # REQUEST_TIMEOUT socket timeout is already in effect.
+            httpd.socket = ssl_context.wrap_socket(
+                httpd.socket, server_side=True, do_handshake_on_connect=False
+            )
 
             logger.info("mTLS enabled - Server running at https://localhost:%d/", PORT)
             logger.info("Clients must present valid certificates signed by the CA")

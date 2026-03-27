@@ -418,6 +418,7 @@ Click outside overlay to dismiss.
 - Client certificate requirement
 - Certificate Authority (CA) for trust chain
 - TLS 1.2+ minimum version
+- TLS handshake performed on worker threads; a stalled negotiation cannot block new connections
 
 **Certificates Required:**
 - CA certificate
@@ -440,6 +441,15 @@ Click outside overlay to dismiss.
   - Mobile devices (iOS, Android)
   - Command-line tools (curl, wget)
   - Programming libraries (Python requests, Node.js)
+
+### DoS Hardening
+
+**Purpose:** Limit the impact of abusive or malformed requests at the application layer
+
+**Measures:**
+- Request body capped at 64 KB (HTTP 413 if exceeded); configurable via `MAX_BODY_BYTES`
+- Worker thread pool bounded at 20 concurrent requests; excess connections rejected immediately; configurable via `MAX_WORKERS`
+- 30-second socket read/write timeout per connection drops slow or idle clients; configurable via `REQUEST_TIMEOUT`
 
 ---
 
