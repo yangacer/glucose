@@ -1601,11 +1601,9 @@ def create_ssl_context():
     # Load server certificate and key
     context.load_cert_chain(certfile=SERVER_CERT_PATH, keyfile=SERVER_KEY_PATH)
 
-    # Set minimum TLS version to 1.2
-    context.minimum_version = ssl.TLSVersion.TLSv1_2
-
-    # Configure cipher suites (prefer strong ciphers)
-    context.set_ciphers('HIGH:!aNULL:!MD5:!RC4')
+    # Require TLS 1.3 minimum. TLS 1.3 cipher suites are fixed by the
+    # protocol, so set_ciphers() is not needed.
+    context.minimum_version = ssl.TLSVersion.TLSv1_3
 
     # Check certificate expiration
     check_certificate_expiration(SERVER_CERT_PATH)

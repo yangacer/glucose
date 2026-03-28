@@ -599,7 +599,7 @@ to run the same migration twice.
 
 **Security Settings:**
 - `ssl.CERT_REQUIRED` - Mandatory client certificate
-- TLS 1.2+ minimum version
+- TLS 1.3 minimum version (TLS 1.2 and below rejected; TLS 1.3 cipher suites are fixed by the protocol)
 - Directory listing disabled (403 Forbidden)
 - TLS handshake deferred to worker threads (`do_handshake_on_connect=False`) — a stalled TLS negotiation times out via `REQUEST_TIMEOUT` and cannot block the main accept loop
 

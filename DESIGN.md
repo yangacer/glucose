@@ -417,7 +417,8 @@ Click outside overlay to dismiss.
 - Server certificate verification
 - Client certificate requirement
 - Certificate Authority (CA) for trust chain
-- TLS 1.2+ minimum version
+- TLS 1.3 minimum version (TLS 1.2 and below rejected)
+- TLS 1.3 cipher suites are fixed by the protocol (not operator-configurable)
 - TLS handshake performed on worker threads; a stalled negotiation cannot block new connections
 
 **Certificates Required:**
