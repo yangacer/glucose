@@ -1639,23 +1639,25 @@ class GlucoseServer(socketserver.ThreadingTCPServer):
         super().server_close()
 
     def handle_error(self, request, client_address):
-        logger.exception("Unhandled exception processing request from %s", client_address[0])
+        exc = sys.exc_info()[1]
+        if getattr(exc, 'skip_traceback', False):
+            logger.warning("Error from %s: %s", client_address[0], exc)
+        else:
+            logger.exception("Unhandled exception processing request from %s", client_address[0])
 
 
 class SecureGlucoseHandler(GlucoseHandler):
     """Extended handler that logs client certificate info."""
 
     def setup(self):
-        # super().setup() calls self.connection.settimeout(REQUEST_TIMEOUT),
-        # so the handshake below is bounded by that timeout.
+        # super().setup() applies REQUEST_TIMEOUT to the socket, so the
+        # handshake is bounded by that timeout.
         super().setup()
         try:
             self.request.do_handshake()
-        except ssl.SSLError as e:
+        except (ssl.SSLError, OSError) as e:
             logger.warning("TLS handshake failed from %s: %s", self.client_address[0], e)
-            raise
-        except OSError as e:
-            logger.warning("TLS handshake I/O error from %s: %s", self.client_address[0], e)
+            e.skip_traceback = True
             raise
         log_client_certificate(self.request, self.client_address)
 

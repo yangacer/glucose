@@ -591,6 +591,11 @@ to run the same migration twice.
 - `check_certificate_expiration()` - Warns if cert expiring soon
 - `log_client_certificate()` - Logs client CN on connection
 
+**Error Handling:**
+- TLS handshake errors (`ssl.SSLError`, `OSError`) caught in `SecureGlucoseHandler.setup()`, logged as warnings, and re-raised with `e.skip_traceback = True`
+- `GlucoseServer.handle_error()` checks `skip_traceback` on the exception; if set, logs a single warning line without a traceback; otherwise logs the full traceback
+- The `skip_traceback` pattern is generic and can be applied to any exception to suppress traceback noise in `handle_error()`
+
 **Certificate Requirements:**
 - CA cert: `certs/ca/ca-cert.pem`
 - Server cert: `certs/server/server-cert.pem`
@@ -853,6 +858,11 @@ PORT=8443 python3 server.py
 - **Problem:** With `do_handshake_on_connect=True` (Python default), a client that completes the TCP handshake but stalls during TLS negotiation blocks the main thread inside `accept()`, preventing any new connections
 - **Solution:** `do_handshake_on_connect=False`; handshake moved into `SecureGlucoseHandler.setup()` on a worker thread where `REQUEST_TIMEOUT` applies
 - **Impact:** Stalled TLS clients time out in 30 s without affecting the accept loop
+
+**6. TLS error traceback noise (FIXED)**
+- **Problem:** `ssl.SSLError` and `OSError` during TLS handshake propagated to `handle_error()`, which logged a full traceback — noisy and misleading for routine client-side failures
+- **Solution:** Exceptions caught in `setup()`, logged as a warning, tagged with `e.skip_traceback = True`, then re-raised; `handle_error()` checks the flag and skips the traceback
+- **Impact:** Clean single-line warning logged per failed handshake; real unhandled exceptions still get full tracebacks
 
 **Diagnostic Steps:**
 ```bash
