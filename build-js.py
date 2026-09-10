@@ -137,7 +137,7 @@ def minify(content, output_file):
     
     try:
         result = subprocess.run(
-            ["terser", str(temp_file), "-o", str(output_file), "--compress", "--mangle", "--toplevel"],
+            ["npx", "--yes", "terser", str(temp_file), "-o", str(output_file), "--compress", "--mangle", "--toplevel"],
             check=True,
             capture_output=True,
             text=True
@@ -182,6 +182,12 @@ def update_index_html(version):
         replacement = f'<!-- JavaScript modules -->\n    <script src="js/release/app.min.js?v={version}"></script>\n</body>'
         
         new_content = re.sub(pattern, replacement, content, flags=re.DOTALL)
+        
+        # Also update the version in the footer
+        version_pattern = r'<span id="app-version">.*?</span>'
+        version_replacement = f'<span id="app-version">{version}</span>'
+        new_content = re.sub(version_pattern, version_replacement, new_content)
+        
         INDEX_HTML.write_text(new_content)
         print(f"✅ {INDEX_HTML} generated from {dev_html}")
     else:
