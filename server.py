@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+from __future__ import annotations
 import http.server
 import socketserver
 import json
@@ -17,6 +18,8 @@ from zoneinfo import ZoneInfo
 import os
 import ssl
 from collections import defaultdict
+import csv
+import io
 
 PORT = int(os.environ.get('PORT', '8443'))  # Default HTTPS port for mTLS
 DB_PATH = os.environ.get('DB_PATH', 'glucose.db')
@@ -1159,6 +1162,7 @@ class GlucoseHandler(http.server.SimpleHTTPRequestHandler):
                 '/api/dashboard/cv-charts': lambda: self.handle_get_cv_charts(query_params),
                 '/api/dashboard/risk-metrics': lambda: self.handle_get_risk_metrics(query_params),
                 '/api/dashboard/prediction': lambda: self.handle_get_prediction(query_params),
+                '/api/export': lambda: self.handle_get_export(query_params),
             }
 
             if path in route_handlers:
@@ -1562,6 +1566,243 @@ class GlucoseHandler(http.server.SimpleHTTPRequestHandler):
                 'warnings': ['Unable to generate prediction due to error']
             }, status=500)
 
+
+
+    def handle_get_export(self, query_params):
+        try:
+            import openpyxl
+            from openpyxl.styles import PatternFill, Font, Alignment
+        except ImportError:
+            self._send_error_json("openpyxl is not installed. Please run: pip install openpyxl", 500)
+            return
+
+        try:
+            tz_name = parse_tz(query_params, required=True)
+        except ValueError as e:
+            self._send_error_json(str(e), 400)
+            return
+
+        today = today_in_tz(tz_name)
+        start_date = query_params.get('start_date', [f'{today.year}-{today.month:02d}-01'])[0]
+        end_date = query_params.get('end_date', [today.strftime('%Y-%m-%d')])[0]
+
+        utc_start, _ = to_utc_range(start_date, tz_name)
+        next_day = datetime.strptime(end_date, '%Y-%m-%d') + timedelta(days=1)
+        next_day_str = next_day.strftime('%Y-%m-%d')
+        _, utc_end = to_utc_range(next_day_str, tz_name)
+
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('SELECT timestamp, level FROM glucose WHERE timestamp >= ? AND timestamp < ? ORDER BY timestamp', (utc_start, utc_end))
+            glucoses = cursor.fetchall()
+            cursor.execute('SELECT timestamp, level FROM insulin WHERE timestamp >= ? AND timestamp < ? ORDER BY timestamp', (utc_start, utc_end))
+            insulins = cursor.fetchall()
+            cursor.execute('''SELECT timestamp, supplement_name, supplement_amount 
+                              FROM supplement_intake si JOIN supplements s ON si.supplement_id = s.id 
+                              WHERE timestamp >= ? AND timestamp < ? ORDER BY timestamp''', (utc_start, utc_end))
+            supplements = cursor.fetchall()
+            cursor.execute('SELECT timestamp, event_name, event_notes FROM event WHERE timestamp >= ? AND timestamp < ? ORDER BY timestamp', (utc_start, utc_end))
+            events = cursor.fetchall()
+            cursor.execute('''SELECT timestamp, nutrition_name, nutrition_kcal 
+                              FROM intake i JOIN nutrition n ON i.nutrition_id = n.id 
+                              WHERE timestamp >= ? AND timestamp < ? ORDER BY timestamp''', (utc_start, utc_end))
+            intakes = cursor.fetchall()
+
+        tz = ZoneInfo(tz_name)
+        def to_local(utc_str):
+            return datetime.strptime(utc_str, '%Y-%m-%d %H:%M:%S').replace(tzinfo=timezone.utc).astimezone(tz)
+            
+        g_data = [(to_local(r[0]), r[1]) for r in glucoses]
+        i_data = [(to_local(r[0]), r[1]) for r in insulins]
+        s_data = [(to_local(r[0]), r[1], r[2]) for r in supplements]
+        e_data = [(to_local(r[0]), r[1], r[2]) for r in events]
+        d_data = [(to_local(r[0]), r[1], r[2]) for r in intakes]
+
+        start_dt = datetime.strptime(start_date, '%Y-%m-%d').date()
+        end_dt = datetime.strptime(end_date, '%Y-%m-%d').date()
+        
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "Glucose Data"
+
+        # Colors definition
+        fill_500 = PatternFill(start_color='000000', end_color='000000', fill_type='solid') # Black
+        fill_400 = PatternFill(start_color='FF0000', end_color='FF0000', fill_type='solid') # Red
+        fill_300 = PatternFill(start_color='FF69B4', end_color='FF69B4', fill_type='solid') # Pink
+        fill_200 = PatternFill(start_color='FFFF00', end_color='FFFF00', fill_type='solid') # Yellow
+        fill_100 = PatternFill(start_color='ADD8E6', end_color='ADD8E6', fill_type='solid') # Light Blue
+        fill_50 = PatternFill(start_color='90EE90', end_color='90EE90', fill_type='solid') # Light Green
+        fill_low = PatternFill(start_color='FFA500', end_color='FFA500', fill_type='solid') # Orange
+
+        # Add Legend at the top
+        legend_row = ["> 500", "400-499", "300-399", "200-299", "100-199", "50-99", "< 50"]
+        ws.append(legend_row)
+        
+        # Style Legend
+        legend_fills = [fill_500, fill_400, fill_300, fill_200, fill_100, fill_50, fill_low]
+        for col_num in range(1, len(legend_row) + 1):
+            cell = ws.cell(row=1, column=col_num)
+            cell.fill = legend_fills[col_num - 1]
+            cell.alignment = Alignment(horizontal='center')
+            if col_num == 1: # > 500 is black background, needs white text
+                cell.font = Font(color='FFFFFF', bold=True)
+            else:
+                cell.font = Font(bold=True)
+                
+        # Empty row for spacing
+        ws.append([])
+
+        header = ['Date', 'AMPS', 'Units'] + [f'+ {i}' for i in range(1, 12)] + ['PMPS', 'Units'] + [f'+ {i}' for i in range(1, 12)] + ['藥品', '事件', '飲食熱量']
+        ws.append(header)
+
+        # Style header
+        for col_num in range(1, len(header) + 1):
+            cell = ws.cell(row=3, column=col_num)
+            cell.font = Font(bold=True)
+            cell.alignment = Alignment(horizontal='center')
+
+        # Colors definition
+        # BG > 500
+        fill_500 = PatternFill(start_color='000000', end_color='000000', fill_type='solid') # Black
+        # BG 400-499
+        fill_400 = PatternFill(start_color='FF0000', end_color='FF0000', fill_type='solid') # Red
+        # BG 300-399
+        fill_300 = PatternFill(start_color='FF69B4', end_color='FF69B4', fill_type='solid') # Pink
+        # BG 200-299
+        fill_200 = PatternFill(start_color='FFFF00', end_color='FFFF00', fill_type='solid') # Yellow
+        # BG 100-199
+        fill_100 = PatternFill(start_color='ADD8E6', end_color='ADD8E6', fill_type='solid') # Light Blue
+        # BG 50-99
+        fill_50 = PatternFill(start_color='90EE90', end_color='90EE90', fill_type='solid') # Light Green
+        # BG < 50
+        fill_low = PatternFill(start_color='FFA500', end_color='FFA500', fill_type='solid') # Orange
+
+        def get_fill_for_bg(val_str):
+            if not val_str: return None
+            try:
+                v = float(val_str)
+                if v > 500: return fill_500
+                elif v >= 400: return fill_400
+                elif v >= 300: return fill_300
+                elif v >= 200: return fill_200
+                elif v >= 100: return fill_100
+                elif v >= 50: return fill_50
+                else: return fill_low
+            except:
+                return None
+
+        def get_font_for_bg(val_str):
+            if not val_str: return None
+            try:
+                v = float(val_str)
+                if v > 500: 
+                    return Font(color='FFFFFF', bold=True)
+                return None
+            except:
+                return None
+
+        current_date = start_dt
+        row_idx = 4
+        while current_date <= end_dt:
+            def get_in_range(data, s_dt, e_dt):
+                return [d for d in data if s_dt <= d[0] < e_dt]
+
+            day_start = datetime.combine(current_date, dt_time(0, 0), tzinfo=tz)
+            am_end = datetime.combine(current_date, dt_time(12, 0), tzinfo=tz)
+            day_end = datetime.combine(current_date + timedelta(days=1), dt_time(0, 0), tzinfo=tz)
+            
+            day_s = get_in_range(s_data, day_start, day_end)
+            day_e = get_in_range(e_data, day_start, day_end)
+            day_d = get_in_range(d_data, day_start, day_end)
+            
+            am_insulins = get_in_range(i_data, day_start, am_end)
+            pm_insulins = get_in_range(i_data, am_end, day_end)
+            
+            am_anchor = am_insulins[0][0] if am_insulins else datetime.combine(current_date, dt_time(8, 0), tzinfo=tz)
+            pm_anchor = pm_insulins[0][0] if pm_insulins else datetime.combine(current_date, dt_time(20, 0), tzinfo=tz)
+            
+            if not am_insulins and pm_insulins:
+                am_anchor = pm_anchor - timedelta(hours=12)
+            if not pm_insulins and am_insulins:
+                pm_anchor = am_anchor + timedelta(hours=12)
+                
+            am_units = am_insulins[0][1] if am_insulins else ''
+            pm_units = pm_insulins[0][1] if pm_insulins else ''
+            
+            def place_glucoses(anchor, cycle_glucoses):
+                cells = [''] * 12
+                for g_dt, g_lvl in cycle_glucoses:
+                    delta_h = (g_dt - anchor).total_seconds() / 3600.0
+                    idx = round(delta_h)
+                    if idx <= 0:
+                        cells[0] = str(g_lvl)
+                    elif 1 <= idx <= 11:
+                        cells[idx] = str(g_lvl)
+                return cells
+
+            am_glucoses = get_in_range(g_data, am_anchor - timedelta(hours=2), am_anchor + timedelta(hours=11, minutes=30))
+            pm_glucoses = get_in_range(g_data, pm_anchor - timedelta(hours=2), pm_anchor + timedelta(hours=11, minutes=30))
+            
+            am_cells = place_glucoses(am_anchor, am_glucoses)
+            pm_cells = place_glucoses(pm_anchor, pm_glucoses)
+            
+            med_str = '; '.join([f"{d[0].strftime('%H:%M')} {d[1]} {d[2]:g}" for d in day_s])
+            
+            event_strs = []
+            for d in day_e:
+                note = f" ({d[2]})" if d[2] else ""
+                event_strs.append(f"{d[0].strftime('%H:%M')} {d[1]}{note}")
+            evt_str = '; '.join(event_strs)
+            
+            diet_strs = []
+            total_kcal = 0
+            for d in day_d:
+                diet_strs.append(f"{d[0].strftime('%H:%M')} {d[1]} {d[2]:g}kcal")
+                total_kcal += d[2]
+            
+            diet_str = '; '.join(diet_strs)
+            if total_kcal > 0:
+                diet_str += f" (Total: {total_kcal:g}kcal)"
+                
+            row = [
+                current_date.strftime('%b %d, %Y'),
+                am_cells[0], am_units
+            ] + am_cells[1:] + [
+                pm_cells[0], pm_units
+            ] + pm_cells[1:] + [
+                med_str, evt_str, diet_str
+            ]
+            
+            ws.append(row)
+
+            # Apply styling to glucose cells
+            # AM cells are at columns: 2 (AMPS), 4..14 (+1..+11)
+            # PM cells are at columns: 15 (PMPS), 17..27 (+1..+11)
+            glucose_col_indices = [2] + list(range(4, 15)) + [15] + list(range(17, 28))
+            
+            for col_idx in glucose_col_indices:
+                cell_val = row[col_idx - 1]
+                if cell_val:
+                    cell = ws.cell(row=row_idx, column=col_idx)
+                    cell.alignment = Alignment(horizontal='center')
+                    fill = get_fill_for_bg(cell_val)
+                    if fill: cell.fill = fill
+                    font = get_font_for_bg(cell_val)
+                    if font: cell.font = font
+            
+            row_idx += 1
+            current_date += timedelta(days=1)
+            
+        output = io.BytesIO()
+        wb.save(output)
+        xlsx_bytes = output.getvalue()
+        
+        self.send_response(200)
+        self.send_header('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+        self.send_header('Content-Disposition', f'attachment; filename="glucose_export_{start_date}_to_{end_date}.xlsx"')
+        self.send_header('Content-Length', str(len(xlsx_bytes)))
+        self.end_headers()
+        self.wfile.write(xlsx_bytes)
 
 # ============================================================================
 # Server Initialization

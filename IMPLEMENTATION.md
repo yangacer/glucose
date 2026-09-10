@@ -136,6 +136,15 @@ both statements execute inside one atomic transaction.
 - **Formula:** `f(G) = 1.509 × (ln(G)^1.084 - 5.381)`
 - **LBGI:** Averages low-risk values where f(G) < 0
 - **HBGI:** Averages high-risk values where f(G) > 0
+
+### Excel Export Logic
+- **Function:** `handle_get_export(query_params)`
+- **Logic:** 
+  - Retrieves all records in user timezone.
+  - Groups them into 12-hour AM (`00:00`-`11:59`) and PM (`12:00`-`23:59`) blocks.
+  - Identifies the "anchor" time based on the insulin injection in that block. If an injection is missing in one block (e.g., for 24-hour Toujeo), the anchor time is extrapolated by 12 hours from the injection in the other block.
+  - Maps glucose readings into columns (`PS`, `+1`..`+11`) by rounding the time difference relative to the anchor.
+  - Styles cells based on the blood glucose values using `openpyxl`.
 - **ADRR (per window):** Computed as `LBGI + HBGI` directly on the window's readings — no calendar-day grouping. This ensures consistency with LBGI/HBGI and avoids null results when UTC timestamps split a local-time window across calendar dates. `calculate_adrr()` (daily-grouping variant) is retained but not used by `calculate_adrr_data()`.
 
 ### Glucose & Insulin Prediction
@@ -233,6 +242,7 @@ route_handlers = {
 - `/api/dashboard/cv-charts` - CV data for 3 time windows
 - `/api/dashboard/risk-metrics` - LBGI/HBGI/ADRR for 3 time windows
 - `/api/dashboard/prediction` - Glucose & insulin prediction (lookback_days=30 default)
+- `/api/export` - Export health records to .xlsx file with 24-hour cycle grouping and colored BG cells
 
 ---
 

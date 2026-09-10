@@ -33,6 +33,7 @@
                     <label>Start Date: <input type="date" id="chart-start-date"></label>
                     <label>End Date: <input type="date" id="chart-end-date"></label>
                     <button id="update-glucose-chart-btn">Update Chart</button>
+                    <button id="export-excel-btn" style="margin-left: 10px; background-color: #2e7d32; color: white;">Export Excel</button>
                 </div>
                 <canvas id="glucoseChart"></canvas>
             </section>

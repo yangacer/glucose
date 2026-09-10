@@ -377,6 +377,86 @@ Click outside overlay to dismiss.
 
 ---
 
+
+## Data Export (Excel .xlsx)
+
+The application supports exporting health records into a `.xlsx` format compatible with Excel. This is particularly designed to mirror traditional feline diabetes tracking charts while supporting 24-hour insulin regimens (like Toujeo).
+
+### Export Format
+- **Format**: `.xlsx` using the `openpyxl` library (requires `pip install openpyxl`).
+- **Time Range**: User-selectable date range.
+- **Color Legend**: The first row of the exported file contains a color-coded legend for quick reference.
+
+### Color Coding
+Blood glucose readings are automatically highlighted with specific background colors based on their value ranges:
+- `> 500`: Black background, white text
+- `400-499`: Red background
+- `300-399`: Hot Pink (Peach) background
+- `200-299`: Yellow background
+- `100-199`: Light Blue background
+- `50-99`: Light Green background
+- `< 50`: Orange background
+
+### Columns
+The export uses a grid based on AM and PM cycles to track glucose relative to insulin administration:
+- `Date`: Record date (YYYY-MM-DD).
+- `AMPS`: Morning Pre-Shot glucose level (closest glucose reading prior to or exactly at the AM insulin shot).
+- `Units` (AM): Morning insulin dose.
+- `+ 1` to `+ 11` (AM): Glucose readings at corresponding hours after the AM shot.
+- `PMPS`: Evening Pre-Shot glucose level.
+- `Units` (PM): Evening insulin dose.
+- `+ 1` to `+ 11` (PM): Glucose readings at corresponding hours after the PM shot.
+- `藥品` (Medicine): Detailed log of all supplements given that day with timestamps (e.g., `08:00 升素敏 2; 20:00 腸沛錠 1`).
+- `事件` (Events): Detailed log of all events with timestamps and notes (e.g., `14:00 嘔吐 (備註); 16:30 散步`).
+- `飲食熱量` (Diet Calories): Detailed log of all nutrition intake with timestamps, individual kCal, and total daily kCal (e.g., `08:00 罐頭 100kcal; 13:00 零食 50kcal (Total: 150kcal)`).
+
+### 24-Hour Insulin (Toujeo) Handling
+For insulin regimens given once every 24 hours (e.g., Toujeo), the traditional AM/PM grid is preserved for flexibility:
+- **Shot Cycle**: The cycle containing the single injection (AM or PM) populates its `Units` and `PS` (Pre-Shot) normally.
+- **Empty Cycle Alignment**: For the cycle without an injection, the "anchor" time is automatically offset by exactly 12 hours from the injected cycle. Glucose readings are mapped to `+ 1` to `+ 11` relative to this offset anchor, ensuring that the visual grid remains continuous without requiring two shots a day. The `Units` column in the empty cycle is left blank.
+
+---
+
+
+## Data Export (Excel .xlsx)
+
+The application supports exporting health records into a `.xlsx` format compatible with Excel. This is particularly designed to mirror traditional feline diabetes tracking charts while supporting 24-hour insulin regimens (like Toujeo).
+
+### Export Format
+- **Format**: `.xlsx` using the `openpyxl` library (requires `pip install openpyxl`).
+- **Time Range**: User-selectable date range.
+- **Color Legend**: The first row of the exported file contains a color-coded legend for quick reference.
+
+### Color Coding
+Blood glucose readings are automatically highlighted with specific background colors based on their value ranges:
+- `> 500`: Black background, white text
+- `400-499`: Red background
+- `300-399`: Hot Pink (Peach) background
+- `200-299`: Yellow background
+- `100-199`: Light Blue background
+- `50-99`: Light Green background
+- `< 50`: Orange background
+
+### Columns
+The export uses a grid based on AM and PM cycles to track glucose relative to insulin administration:
+- `Date`: Record date (YYYY-MM-DD).
+- `AMPS`: Morning Pre-Shot glucose level (closest glucose reading prior to or exactly at the AM insulin shot).
+- `Units` (AM): Morning insulin dose.
+- `+ 1` to `+ 11` (AM): Glucose readings at corresponding hours after the AM shot.
+- `PMPS`: Evening Pre-Shot glucose level.
+- `Units` (PM): Evening insulin dose.
+- `+ 1` to `+ 11` (PM): Glucose readings at corresponding hours after the PM shot.
+- `藥品` (Medicine): Detailed log of all supplements given that day with timestamps (e.g., `08:00 升素敏 2; 20:00 腸沛錠 1`).
+- `事件` (Events): Detailed log of all events with timestamps and notes (e.g., `14:00 嘔吐 (備註); 16:30 散步`).
+- `飲食熱量` (Diet Calories): Detailed log of all nutrition intake with timestamps, individual kCal, and total daily kCal (e.g., `08:00 罐頭 100kcal; 13:00 零食 50kcal (Total: 150kcal)`).
+
+### 24-Hour Insulin (Toujeo) Handling
+For insulin regimens given once every 24 hours (e.g., Toujeo), the traditional AM/PM grid is preserved for flexibility:
+- **Shot Cycle**: The cycle containing the single injection (AM or PM) populates its `Units` and `PS` (Pre-Shot) normally.
+- **Empty Cycle Alignment**: For the cycle without an injection, the "anchor" time is automatically offset by exactly 12 hours from the injected cycle. Glucose readings are mapped to `+ 1` to `+ 11` relative to this offset anchor, ensuring that the visual grid remains continuous without requiring two shots a day. The `Units` column in the empty cycle is left blank.
+
+---
+
 ## Timezone Support
 
 ### Asymmetric Timezone Design
