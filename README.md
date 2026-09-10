@@ -6,11 +6,21 @@ A personal health monitoring application for tracking feline glucose levels, ins
 
 ## Quick Start
 
+We strongly recommend using a virtual environment (`venv`) to manage dependencies.
+
 ```bash
-# 1. Initialize the database
+# 1. Create and activate a virtual environment
+python3 -m venv .venv
+source .venv/bin/activate
+
+# 2. Install dependencies
+pip install -r requirements.txt
+
+# 3. Initialize the database
 python3 init_db.py
 
-# 2. Start the server (mTLS enabled by default, port 8443)
+# 4. Start the server (mTLS enabled by default, port 8443)
+# Note: If using tools/run.sh, it will automatically detect and use the .venv!
 python3 server.py
 ```
 
@@ -47,7 +57,9 @@ DEBUG_STATIC=true python3 server.py
 
 ### Requirements
 
-- Python 3.8+ (standard library only — no pip dependencies)
+- Python 3.8+
+- Python dependencies: `pip install -r requirements.txt` (recommend using `venv` for isolation)
+- [terser]
 - [terser](https://terser.org/) — for minifying JavaScript (`npm install -g terser`)
 
 ### Running Tests

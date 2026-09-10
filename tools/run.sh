@@ -19,4 +19,11 @@
 #
 
 set -o xtrace
-PORT=443 authbind --deep python3 server.py
+PYTHON_BIN="python3"
+if [ -d ".venv" ]; then
+    PYTHON_BIN=".venv/bin/python3"
+elif [ -d "venv" ]; then
+    PYTHON_BIN="venv/bin/python3"
+fi
+
+PORT=443 authbind --deep $PYTHON_BIN server.py
