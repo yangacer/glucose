@@ -18,6 +18,12 @@ function initializeApp() {
         const tz = encodeURIComponent(getClientTz());
         window.location.href = `${API_BASE}/export?start_date=${startDate}&end_date=${endDate}&tz=${tz}`;
     });
+    document.getElementById('export-csv-btn').addEventListener('click', () => {
+        const startDate = document.getElementById('chart-start-date').value;
+        const endDate = document.getElementById('chart-end-date').value;
+        const tz = encodeURIComponent(getClientTz());
+        window.location.href = `${API_BASE}/export?start_date=${startDate}&end_date=${endDate}&tz=${tz}&format=csv`;
+    });
     document.getElementById('update-cv-btn').addEventListener('click', loadCVCharts);
     document.getElementById('update-risk-btn').addEventListener('click', loadRiskMetrics);
     document.getElementById('update-summary-btn').addEventListener('click', loadSummary);

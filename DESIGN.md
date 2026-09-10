@@ -378,7 +378,7 @@ Click outside overlay to dismiss.
 ---
 
 
-## Data Export (Excel .xlsx)
+## Data Export (Excel .xlsx / CSV)
 
 The application supports exporting health records into a `.xlsx` format compatible with Excel. This is particularly designed to mirror traditional feline diabetes tracking charts while supporting 24-hour insulin regimens (like Toujeo).
 
@@ -418,7 +418,7 @@ For insulin regimens given once every 24 hours (e.g., Toujeo), the traditional A
 ---
 
 
-## Data Export (Excel .xlsx)
+## Data Export (Excel .xlsx / CSV)
 
 The application supports exporting health records into a `.xlsx` format compatible with Excel. This is particularly designed to mirror traditional feline diabetes tracking charts while supporting 24-hour insulin regimens (like Toujeo).
 

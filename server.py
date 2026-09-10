@@ -1569,12 +1569,15 @@ class GlucoseHandler(http.server.SimpleHTTPRequestHandler):
 
 
     def handle_get_export(self, query_params):
-        try:
-            import openpyxl
-            from openpyxl.styles import PatternFill, Font, Alignment
-        except ImportError:
-            self._send_error_json("openpyxl is not installed. Please run: pip install openpyxl", 500)
-            return
+        export_format = query_params.get('format', ['xlsx'])[0]
+        
+        if export_format == 'xlsx':
+            try:
+                import openpyxl
+                from openpyxl.styles import PatternFill, Font, Alignment
+            except ImportError:
+                self._send_error_json("openpyxl is not installed. Please run: pip install openpyxl", 500)
+                return
 
         try:
             tz_name = parse_tz(query_params, required=True)
@@ -1621,61 +1624,53 @@ class GlucoseHandler(http.server.SimpleHTTPRequestHandler):
         start_dt = datetime.strptime(start_date, '%Y-%m-%d').date()
         end_dt = datetime.strptime(end_date, '%Y-%m-%d').date()
         
-        wb = openpyxl.Workbook()
-        ws = wb.active
-        ws.title = "Glucose Data"
-
-        # Colors definition
-        fill_500 = PatternFill(start_color='000000', end_color='000000', fill_type='solid') # Black
-        fill_400 = PatternFill(start_color='FF0000', end_color='FF0000', fill_type='solid') # Red
-        fill_300 = PatternFill(start_color='FF69B4', end_color='FF69B4', fill_type='solid') # Pink
-        fill_200 = PatternFill(start_color='FFFF00', end_color='FFFF00', fill_type='solid') # Yellow
-        fill_100 = PatternFill(start_color='ADD8E6', end_color='ADD8E6', fill_type='solid') # Light Blue
-        fill_50 = PatternFill(start_color='90EE90', end_color='90EE90', fill_type='solid') # Light Green
-        fill_low = PatternFill(start_color='FFA500', end_color='FFA500', fill_type='solid') # Orange
+        if export_format == 'xlsx':
+            wb = openpyxl.Workbook()
+            ws = wb.active
+            ws.title = "Glucose Data"
+    
+            # Colors definition
+            fill_500 = PatternFill(start_color='000000', end_color='000000', fill_type='solid') # Black
+            fill_400 = PatternFill(start_color='FF0000', end_color='FF0000', fill_type='solid') # Red
+            fill_300 = PatternFill(start_color='FF69B4', end_color='FF69B4', fill_type='solid') # Pink
+            fill_200 = PatternFill(start_color='FFFF00', end_color='FFFF00', fill_type='solid') # Yellow
+            fill_100 = PatternFill(start_color='ADD8E6', end_color='ADD8E6', fill_type='solid') # Light Blue
+            fill_50 = PatternFill(start_color='90EE90', end_color='90EE90', fill_type='solid') # Light Green
+            fill_low = PatternFill(start_color='FFA500', end_color='FFA500', fill_type='solid') # Orange
 
         # Add Legend at the top
-        legend_row = ["> 500", "400-499", "300-399", "200-299", "100-199", "50-99", "< 50"]
-        ws.append(legend_row)
-        
-        # Style Legend
-        legend_fills = [fill_500, fill_400, fill_300, fill_200, fill_100, fill_50, fill_low]
-        for col_num in range(1, len(legend_row) + 1):
-            cell = ws.cell(row=1, column=col_num)
-            cell.fill = legend_fills[col_num - 1]
-            cell.alignment = Alignment(horizontal='center')
-            if col_num == 1: # > 500 is black background, needs white text
-                cell.font = Font(color='FFFFFF', bold=True)
-            else:
-                cell.font = Font(bold=True)
-                
-        # Empty row for spacing
-        ws.append([])
-
         header = ['Date', 'AMPS', 'Units'] + [f'+ {i}' for i in range(1, 12)] + ['PMPS', 'Units'] + [f'+ {i}' for i in range(1, 12)] + ['藥品', '事件', '飲食熱量']
-        ws.append(header)
 
-        # Style header
-        for col_num in range(1, len(header) + 1):
-            cell = ws.cell(row=3, column=col_num)
-            cell.font = Font(bold=True)
-            cell.alignment = Alignment(horizontal='center')
-
-        # Colors definition
-        # BG > 500
-        fill_500 = PatternFill(start_color='000000', end_color='000000', fill_type='solid') # Black
-        # BG 400-499
-        fill_400 = PatternFill(start_color='FF0000', end_color='FF0000', fill_type='solid') # Red
-        # BG 300-399
-        fill_300 = PatternFill(start_color='FF69B4', end_color='FF69B4', fill_type='solid') # Pink
-        # BG 200-299
-        fill_200 = PatternFill(start_color='FFFF00', end_color='FFFF00', fill_type='solid') # Yellow
-        # BG 100-199
-        fill_100 = PatternFill(start_color='ADD8E6', end_color='ADD8E6', fill_type='solid') # Light Blue
-        # BG 50-99
-        fill_50 = PatternFill(start_color='90EE90', end_color='90EE90', fill_type='solid') # Light Green
-        # BG < 50
-        fill_low = PatternFill(start_color='FFA500', end_color='FFA500', fill_type='solid') # Orange
+        if export_format == 'xlsx':
+            legend_row = ["> 500", "400-499", "300-399", "200-299", "100-199", "50-99", "< 50"]
+            ws.append(legend_row)
+            
+            # Style Legend
+            legend_fills = [fill_500, fill_400, fill_300, fill_200, fill_100, fill_50, fill_low]
+            for col_num in range(1, len(legend_row) + 1):
+                cell = ws.cell(row=1, column=col_num)
+                cell.fill = legend_fills[col_num - 1]
+                cell.alignment = Alignment(horizontal='center')
+                if col_num == 1:
+                    cell.font = Font(color='FFFFFF', bold=True)
+                else:
+                    cell.font = Font(bold=True)
+                    
+            # Empty row for spacing
+            ws.append([])
+    
+            ws.append(header)
+    
+            # Style header
+            for col_num in range(1, len(header) + 1):
+                cell = ws.cell(row=3, column=col_num)
+                cell.font = Font(bold=True)
+                cell.alignment = Alignment(horizontal='center')
+        else:
+            # CSV mode
+            csv_output = io.StringIO()
+            writer = csv.writer(csv_output)
+            writer.writerow(header)
 
         def get_fill_for_bg(val_str):
             if not val_str: return None
@@ -1773,36 +1768,44 @@ class GlucoseHandler(http.server.SimpleHTTPRequestHandler):
                 med_str, evt_str, diet_str
             ]
             
-            ws.append(row)
-
-            # Apply styling to glucose cells
-            # AM cells are at columns: 2 (AMPS), 4..14 (+1..+11)
-            # PM cells are at columns: 15 (PMPS), 17..27 (+1..+11)
-            glucose_col_indices = [2] + list(range(4, 15)) + [15] + list(range(17, 28))
-            
-            for col_idx in glucose_col_indices:
-                cell_val = row[col_idx - 1]
-                if cell_val:
-                    cell = ws.cell(row=row_idx, column=col_idx)
-                    cell.alignment = Alignment(horizontal='center')
-                    fill = get_fill_for_bg(cell_val)
-                    if fill: cell.fill = fill
-                    font = get_font_for_bg(cell_val)
-                    if font: cell.font = font
-            
-            row_idx += 1
+            if export_format == 'xlsx':
+                ws.append(row)
+    
+                # Apply styling to glucose cells
+                glucose_col_indices = [2] + list(range(4, 15)) + [15] + list(range(17, 28))
+                for col_idx in glucose_col_indices:
+                    cell_val = row[col_idx - 1]
+                    if cell_val:
+                        cell = ws.cell(row=row_idx, column=col_idx)
+                        cell.alignment = Alignment(horizontal='center')
+                        fill = get_fill_for_bg(cell_val)
+                        if fill: cell.fill = fill
+                        font = get_font_for_bg(cell_val)
+                        if font: cell.font = font
+                
+                row_idx += 1
+            else:
+                writer.writerow(row)
             current_date += timedelta(days=1)
             
-        output = io.BytesIO()
-        wb.save(output)
-        xlsx_bytes = output.getvalue()
+        if export_format == 'xlsx':
+            output = io.BytesIO()
+            wb.save(output)
+            output_bytes = output.getvalue()
+            content_type = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            filename = f"glucose_export_{start_date}_to_{end_date}.xlsx"
+        else:
+            # CSV mode requires UTF-8 BOM for Excel compatibility
+            output_bytes = '\ufeff'.encode('utf8') + csv_output.getvalue().encode('utf-8')
+            content_type = 'text/csv; charset=utf-8'
+            filename = f"glucose_export_{start_date}_to_{end_date}.csv"
         
         self.send_response(200)
-        self.send_header('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-        self.send_header('Content-Disposition', f'attachment; filename="glucose_export_{start_date}_to_{end_date}.xlsx"')
-        self.send_header('Content-Length', str(len(xlsx_bytes)))
+        self.send_header('Content-Type', content_type)
+        self.send_header('Content-Disposition', f'attachment; filename="{filename}"')
+        self.send_header('Content-Length', str(len(output_bytes)))
         self.end_headers()
-        self.wfile.write(xlsx_bytes)
+        self.wfile.write(output_bytes)
 
 # ============================================================================
 # Server Initialization
