@@ -348,15 +348,45 @@ async function loadSupplementIntakeAudit() {
             <td>${record.supplement_name}</td>
             <td>${record.supplement_amount}</td>
             <td>
+                <button class="edit-btn" data-id="${record.id}" data-ts="${record.timestamp}" data-suppid="${record.supplement_id}" data-name="${record.supplement_name}" data-amt="${record.supplement_amount}">Edit</button>
                 <button class="delete-btn" data-id="${record.id}">Delete</button>
             </td>
         `;
         tbody.appendChild(tr);
     });
 
+    tbody.querySelectorAll('.edit-btn').forEach(btn => {
+        btn.addEventListener('click', () => editSupplementIntake(btn.dataset.id, btn.dataset.ts, btn.dataset.suppid, btn.dataset.name, btn.dataset.amt));
+    });
     tbody.querySelectorAll('.delete-btn').forEach(btn => {
         btn.addEventListener('click', () => deleteSupplementIntake(btn.dataset.id));
     });
+}
+
+async function editSupplementIntake(id, timestamp, suppId, suppName, amount) {
+    const newTimestamp = prompt(`Edit Supplement Intake (${suppName})\nEnter new timestamp (local time, YYYY-MM-DDTHH:MM):`, toInputTimestamp(timestamp));
+    if (newTimestamp === null) return;
+    const newAmount = prompt(`Enter new amount for ${suppName}:`, amount);
+    if (newAmount === null) return;
+
+    if (newTimestamp && newAmount) {
+        const response = await fetch(`${API_BASE}/supplement-intake/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                timestamp: toDbTimestamp(newTimestamp),
+                supplement_id: parseInt(suppId),
+                supplement_amount: parseFloat(newAmount)
+            })
+        });
+
+        if (response.ok) {
+            alert('Record updated successfully!');
+            loadSupplementIntakeAudit();
+        } else {
+            alert('Failed to update record');
+        }
+    }
 }
 
 /**
@@ -403,15 +433,47 @@ async function loadEventAudit() {
             <td>${record.event_name}</td>
             <td>${record.event_notes || ''}</td>
             <td>
+                <button class="edit-btn" data-id="${record.id}" data-ts="${record.timestamp}" data-name="${record.event_name}" data-notes="${record.event_notes || ''}">Edit</button>
                 <button class="delete-btn" data-id="${record.id}">Delete</button>
             </td>
         `;
         tbody.appendChild(tr);
     });
 
+    tbody.querySelectorAll('.edit-btn').forEach(btn => {
+        btn.addEventListener('click', () => editEvent(btn.dataset.id, btn.dataset.ts, btn.dataset.name, btn.dataset.notes));
+    });
     tbody.querySelectorAll('.delete-btn').forEach(btn => {
         btn.addEventListener('click', () => deleteEvent(btn.dataset.id));
     });
+}
+
+async function editEvent(id, timestamp, name, notes) {
+    const newTimestamp = prompt('Enter new timestamp (local time, YYYY-MM-DDTHH:MM):', toInputTimestamp(timestamp));
+    if (newTimestamp === null) return;
+    const newName = prompt('Enter new event name:', name);
+    if (newName === null) return;
+    const newNotes = prompt('Enter new event notes (optional):', notes || '');
+    if (newNotes === null) return;
+
+    if (newTimestamp && newName) {
+        const response = await fetch(`${API_BASE}/event/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                timestamp: toDbTimestamp(newTimestamp),
+                event_name: newName,
+                event_notes: newNotes
+            })
+        });
+
+        if (response.ok) {
+            alert('Event updated successfully!');
+            loadEventAudit();
+        } else {
+            alert('Failed to update event');
+        }
+    }
 }
 
 /**
@@ -451,15 +513,49 @@ async function loadNutritionAudit() {
             <td>${record.weight}</td>
             <td>${record.kcal_per_gram.toFixed(4)}</td>
             <td>
+                <button class="edit-btn" data-id="${record.id}" data-name="${record.nutrition_name}" data-kcal="${record.kcal}" data-weight="${record.weight}">Edit</button>
                 <button class="delete-btn" data-id="${record.id}">Delete</button>
             </td>
         `;
         tbody.appendChild(tr);
     });
 
+    tbody.querySelectorAll('.edit-btn').forEach(btn => {
+        btn.addEventListener('click', () => editNutrition(btn.dataset.id, btn.dataset.name, btn.dataset.kcal, btn.dataset.weight));
+    });
     tbody.querySelectorAll('.delete-btn').forEach(btn => {
         btn.addEventListener('click', () => deleteNutritionItem(btn.dataset.id));
     });
+}
+
+async function editNutrition(id, name, kcal, weight) {
+    const newName = prompt('Enter new nutrition name:', name);
+    if (newName === null) return;
+    const newKcal = prompt('Enter new total kCal:', kcal);
+    if (newKcal === null) return;
+    const newWeight = prompt('Enter new weight (g):', weight);
+    if (newWeight === null) return;
+
+    if (newName && newKcal && newWeight) {
+        const response = await fetch(`${API_BASE}/nutrition/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                nutrition_name: newName,
+                kcal: parseFloat(newKcal),
+                weight: parseFloat(newWeight)
+            })
+        });
+
+        if (response.ok) {
+            alert('Nutrition updated successfully!');
+            loadNutritionAudit();
+            if (typeof loadNutritionOptions === 'function') loadNutritionOptions();
+            if (typeof loadNutritionList === 'function') loadNutritionList();
+        } else {
+            alert('Failed to update nutrition');
+        }
+    }
 }
 
 /**
